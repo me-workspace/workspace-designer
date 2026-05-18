@@ -1,19 +1,19 @@
 'use client';
 
-import { WorkspaceSelection } from '@/types';
+import type { WorkspaceSelection } from '@/types';
 import { useState } from 'react';
 
 interface Props {
   selection: WorkspaceSelection;
   total: number;
+  qty: number;
   onClose: () => void;
 }
 
-function formatIDR(amount: number) {
-  return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(amount);
-}
+const idr = (n: number) =>
+  new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(n);
 
-export default function CheckoutModal({ selection, total, onClose }: Props) {
+export default function CheckoutModal({ selection, total, qty, onClose }: Props) {
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
 
@@ -21,93 +21,122 @@ export default function CheckoutModal({ selection, total, onClose }: Props) {
     ...(selection.desk ? [{ name: `${selection.desk.name} Desk`, price: selection.desk.price, qty: 1 }] : []),
     ...(selection.chair ? [{ name: `${selection.chair.name} Chair`, price: selection.chair.price, qty: 1 }] : []),
     ...Object.values(selection.accessories).map(({ item, quantity }) => ({
-      name: item.name,
-      price: item.price,
-      qty: quantity,
+      name: item.name, price: item.price, qty: quantity,
     })),
   ];
 
   const handleRent = () => {
     setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
-      setSubmitted(true);
-    }, 1400);
+    setTimeout(() => { setLoading(false); setSubmitted(true); }, 1400);
   };
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 animate-backdrop"
-      style={{ background: 'rgba(26,21,16,0.55)', backdropFilter: 'blur(4px)' }}
+      style={{
+        position: 'fixed', inset: 0, zIndex: 50,
+        display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16,
+        background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(6px)',
+      }}
       onClick={e => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div className="w-full max-w-md bg-[#F7F2EA] rounded-2xl overflow-hidden shadow-2xl animate-slide-up">
+      <div className="animate-slide-up" style={{
+        width: '100%', maxWidth: 420,
+        background: '#1c1c1f', borderRadius: 18,
+        border: '1px solid #2c2c2f',
+        overflow: 'hidden',
+        boxShadow: '0 32px 80px rgba(0,0,0,0.6)',
+      }}>
         {submitted ? (
           <SuccessView onClose={onClose} />
         ) : (
           <>
             {/* Header */}
-            <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-[#E8E0D0]">
+            <div style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              padding: '20px 20px 16px', borderBottom: '1px solid #2c2c2f',
+            }}>
               <div>
-                <h2 className="text-lg font-bold text-[#1A1510]">Your Setup</h2>
-                <p className="text-sm text-[#9A8E80] mt-0.5">Review before renting</p>
+                <h2 style={{ fontSize: 16, fontWeight: 800, color: '#f2f2f7' }}>Your Setup</h2>
+                <p style={{ fontSize: 11, color: '#71717a', marginTop: 2 }}>Review before renting</p>
               </div>
               <button
                 onClick={onClose}
-                className="w-8 h-8 rounded-full bg-[#E8E0D0] hover:bg-[#D8D0C0] flex items-center justify-center transition-colors"
-              >
-                <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                  <path d="M1 1l10 10M11 1L1 11" stroke="#1A1510" strokeWidth="1.8" strokeLinecap="round" />
-                </svg>
-              </button>
+                style={{
+                  width: 30, height: 30, borderRadius: 8,
+                  background: '#2c2c2f', border: 'none', cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  color: '#71717a', fontSize: 14, fontWeight: 700,
+                }}
+              >✕</button>
             </div>
 
             {/* Line items */}
-            <div className="px-6 py-4 space-y-2 max-h-64 overflow-y-auto">
+            <div style={{ padding: '14px 20px', maxHeight: 220, overflowY: 'auto' }}>
               {items.length === 0 ? (
-                <p className="text-sm text-[#9A8E80] text-center py-4">Nothing selected yet.</p>
+                <p style={{ fontSize: 12, color: '#71717a', textAlign: 'center', padding: '16px 0' }}>
+                  Nothing selected yet.
+                </p>
               ) : (
-                items.map((item, i) => (
-                  <div key={i} className="flex items-baseline justify-between gap-2">
-                    <span className="text-sm text-[#1A1510]">
-                      {item.qty > 1 && <span className="text-[#9A8E80] mr-1">{item.qty}×</span>}
-                      {item.name}
-                    </span>
-                    <span className="text-sm text-[#9A8E80] flex-shrink-0">
-                      {formatIDR(item.price * item.qty)}<span className="text-xs">/mo</span>
-                    </span>
-                  </div>
-                ))
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {items.map((item, i) => (
+                    <div key={i} style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8 }}>
+                      <span style={{ fontSize: 12, color: '#d4d4d8' }}>
+                        {item.qty > 1 && <span style={{ color: '#52525b', marginRight: 4 }}>{item.qty}×</span>}
+                        {item.name}
+                      </span>
+                      <span style={{ fontSize: 11, color: '#71717a', flexShrink: 0 }}>
+                        {idr(item.price * item.qty)}<span style={{ fontSize: 9 }}>/mo</span>
+                      </span>
+                    </div>
+                  ))}
+                </div>
               )}
             </div>
 
             {/* Total + CTA */}
-            <div className="px-6 pb-6 pt-2 border-t border-[#E8E0D0]">
-              <div className="flex items-baseline justify-between mb-4 pt-3">
-                <span className="text-base font-bold text-[#1A1510]">Monthly total</span>
-                <span className="text-xl font-bold text-[#1A1510]">
-                  {formatIDR(total)}<span className="text-sm font-normal text-[#9A8E80]">/mo</span>
+            <div style={{ padding: '14px 20px 20px', borderTop: '1px solid #2c2c2f' }}>
+              <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: qty > 1 ? 6 : 16 }}>
+                <span style={{ fontSize: 12, color: '#71717a' }}>Per workspace</span>
+                <span style={{ fontSize: 13, fontWeight: 700, color: '#f2f2f7' }}>
+                  {idr(total)}<span style={{ fontSize: 9, color: '#52525b', fontWeight: 400 }}>/mo</span>
                 </span>
               </div>
+              {qty > 1 && (
+                <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 16 }}>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: '#f2f2f7' }}>
+                    Total × {qty} workspaces
+                  </span>
+                  <span style={{ fontSize: 18, fontWeight: 800, color: '#4ade80' }}>
+                    {idr(total * qty)}<span style={{ fontSize: 9, color: '#52525b', fontWeight: 400 }}>/mo</span>
+                  </span>
+                </div>
+              )}
 
-              <p className="text-xs text-[#9A8E80] mb-4">
-                Free delivery to anywhere in Bali · Cancel anytime with 7 days notice · Swap items monthly
+              <p style={{ fontSize: 10, color: '#52525b', marginBottom: 14, lineHeight: 1.5 }}>
+                Free delivery anywhere in Bali · Cancel anytime with 7 days notice · Swap items monthly
               </p>
 
               <button
                 onClick={handleRent}
                 disabled={items.length === 0 || loading}
-                className="w-full py-3.5 rounded-xl bg-[#FF6B35] hover:bg-[#E85C25] disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold text-sm transition-all duration-200 shadow-md hover:shadow-lg active:scale-[0.98]"
+                style={{
+                  width: '100%', padding: '12px 0', borderRadius: 10,
+                  background: items.length > 0 && !loading ? '#4ade80' : '#2c2c2f',
+                  color: items.length > 0 && !loading ? '#09090b' : '#3f3f46',
+                  border: 'none', cursor: items.length === 0 ? 'not-allowed' : 'pointer',
+                  fontSize: 13, fontWeight: 800, letterSpacing: '0.01em',
+                  transition: 'all 0.15s',
+                }}
               >
                 {loading ? (
-                  <span className="flex items-center justify-center gap-2">
-                    <svg className="animate-spin" width="16" height="16" viewBox="0 0 16 16" fill="none">
-                      <circle cx="8" cy="8" r="6" stroke="white" strokeWidth="2" strokeDasharray="28" strokeDashoffset="10" />
+                  <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                    <svg className="animate-spin" width="15" height="15" viewBox="0 0 15 15" fill="none">
+                      <circle cx="7.5" cy="7.5" r="5.5" stroke="#09090b" strokeWidth="2" strokeDasharray="25" strokeDashoffset="8" />
                     </svg>
                     Processing…
                   </span>
                 ) : (
-                  'Rent My Setup →'
+                  `Rent ${qty > 1 ? `${qty} Workspaces` : 'My Setup'} →`
                 )}
               </button>
             </div>
@@ -120,18 +149,31 @@ export default function CheckoutModal({ selection, total, onClose }: Props) {
 
 function SuccessView({ onClose }: { onClose: () => void }) {
   return (
-    <div className="px-6 py-10 text-center animate-fade-up">
-      <div className="text-5xl mb-4">🏝</div>
-      <h2 className="text-xl font-bold text-[#1A1510] mb-2">You&apos;re all set!</h2>
-      <p className="text-sm text-[#9A8E80] mb-1">
+    <div className="animate-fade-up" style={{ padding: '40px 24px', textAlign: 'center' }}>
+      <div style={{
+        width: 52, height: 52, borderRadius: '50%',
+        background: 'rgba(74,222,128,0.12)',
+        border: '1.5px solid rgba(74,222,128,0.3)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        margin: '0 auto 16px', color: '#4ade80', fontSize: 22, fontWeight: 700,
+      }}>✓</div>
+      <h2 style={{ fontSize: 18, fontWeight: 800, color: '#f2f2f7', marginBottom: 8 }}>
+        You&apos;re all set!
+      </h2>
+      <p style={{ fontSize: 12, color: '#71717a', lineHeight: 1.6, marginBottom: 6 }}>
         Your workspace is reserved. Our team will reach out within 24 hours to confirm delivery.
       </p>
-      <p className="text-xs text-[#B0A494] mb-8">
+      <p style={{ fontSize: 11, color: '#52525b', marginBottom: 28 }}>
         Questions? hello@monis.rent
       </p>
       <button
         onClick={onClose}
-        className="px-6 py-2.5 rounded-xl bg-[#1A1510] text-white text-sm font-semibold hover:bg-[#2A2520] transition-colors"
+        style={{
+          padding: '10px 24px', borderRadius: 10,
+          background: '#4ade80', color: '#09090b',
+          border: 'none', cursor: 'pointer',
+          fontSize: 12, fontWeight: 800,
+        }}
       >
         Back to designer
       </button>

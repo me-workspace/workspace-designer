@@ -38,3 +38,11 @@ export interface WorkspaceSelection {
   chair: Chair | null;
   accessories: Record<string, { item: Accessory; quantity: number }>;
 }
+
+export interface SavedPkg {
+  id: string;
+  name: string;
+  createdAt: number;
+  selection: WorkspaceSelection;
+  total: number;
+}
