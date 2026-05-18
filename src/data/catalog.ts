@@ -1,4 +1,4 @@
-import type { DeskItem, SeatingItem, DeviceItem } from '@/model/types';
+import type { DeskItem, SeatingItem, DeviceItem, ZoneItem } from '@/model/types';
 
 /* ════════ Catalog ════════
    Plain data. Generic renderers interpret each item's `spec`,
@@ -321,6 +321,53 @@ export const DEVICES: DeviceItem[] = [
     description: 'A hand-thrown ceramic mug from a Bali studio. Small joys matter.',
     tags: ['ceramic', 'local'],
     spec: { group: 'decor', glyph: 'mug', primaryColor: '#d8d2c4', accentColor: '#4ade80', footprint: { w: 0.07, h: 0.11 }, defaultSlot: 'desk-front' },
+  },
+];
+
+/* ════════ Zones — extras placed around the room ════════ */
+
+export const ZONES: ZoneItem[] = [
+  {
+    id: 'coffee-corner', category: 'zone', name: 'Coffee Corner', price: 280000,
+    tagline: 'Barista-grade fuel, steps away.',
+    description: 'A compact counter with an espresso machine, grinder and a row of mugs. Never queue again.',
+    tags: ['coffee', 'espresso', 'counter'],
+    spec: { theme: 'coffee', footprint: { w: 0.26, h: 0.5 }, palette: ['#6a4a32', '#3a2a1e', '#c4455f', '#d8d2c4'] },
+  },
+  {
+    id: 'lounge', category: 'zone', name: 'Lounge Spot', price: 340000,
+    tagline: 'A soft place to think.',
+    description: 'A cushioned sofa and side table — the corner where the best ideas actually happen.',
+    tags: ['sofa', 'relax', 'breakout'],
+    spec: { theme: 'relax', footprint: { w: 0.34, h: 0.46 }, palette: ['#8a6a4a', '#5a4232', '#c8b89a', '#2e2218'] },
+  },
+  {
+    id: 'surf-rack', category: 'zone', name: 'Surf Rack', price: 180000,
+    tagline: 'Dawn patrol, then standup.',
+    description: 'A wall rack holding two surfboards. Because the office is in Bali for a reason.',
+    tags: ['surf', 'outdoor', 'bali'],
+    spec: { theme: 'outdoor', footprint: { w: 0.2, h: 0.56 }, palette: ['#e8a23a', '#3a9ad8', '#d8d2c4', '#2a2118'] },
+  },
+  {
+    id: 'storage-wall', category: 'zone', name: 'Storage Wall', price: 240000,
+    tagline: 'A home for everything.',
+    description: 'A modular shelving unit with bins and boxes. Keeps the desk clear and the mind clearer.',
+    tags: ['shelving', 'storage'],
+    spec: { theme: 'storage', footprint: { w: 0.24, h: 0.58 }, palette: ['#7a5a3a', '#4a3624', '#c4455f', '#3a9ad8'] },
+  },
+  {
+    id: 'meeting-nook', category: 'zone', name: 'Meeting Nook', price: 420000,
+    tagline: 'Gather, decide, move on.',
+    description: 'A round table with three stools — a quick huddle space without booking a room.',
+    tags: ['meeting', 'collab', 'table'],
+    spec: { theme: 'meeting', footprint: { w: 0.3, h: 0.44 }, palette: ['#9a6a3a', '#6a4420', '#38383d', '#28282d'] },
+  },
+  {
+    id: 'zen-corner', category: 'zone', name: 'Zen Corner', price: 160000,
+    tagline: 'Stretch it out.',
+    description: 'A yoga mat, a floor cushion and a tall plant. A reset button you can stand on.',
+    tags: ['wellness', 'yoga', 'calm'],
+    spec: { theme: 'wellness', footprint: { w: 0.24, h: 0.42 }, palette: ['#4a8a6a', '#2a8838', '#c8b89a', '#2e2218'] },
   },
 ];
 

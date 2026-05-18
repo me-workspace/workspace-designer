@@ -1,8 +1,8 @@
 import type {
-  DeskItem, SeatingItem, DeviceItem, DeviceSlot,
-  EnvironmentConfig, PlacedDevice, Station, WorkspaceDesign, Price,
+  DeskItem, SeatingItem, DeviceItem, ZoneItem, DeviceSlot,
+  EnvironmentConfig, PlacedDevice, PlacedZone, Station, WorkspaceDesign, Price,
 } from './types';
-import { DESKS, SEATING, DEVICES, PRESETS } from '@/data/catalog';
+import { DESKS, SEATING, DEVICES, ZONES, PRESETS } from '@/data/catalog';
 
 /* ════════ Catalog lookups ════════ */
 
@@ -13,6 +13,9 @@ export const deviceById = new Map<string, DeviceItem>(DEVICES.map((d): [string, 
 export const getDesk = (id: string | null) => (id ? deskById.get(id) : undefined);
 export const getSeating = (id: string | null) => (id ? seatingById.get(id) : undefined);
 export const getDevice = (id: string) => deviceById.get(id);
+
+export const zoneById = new Map<string, ZoneItem>(ZONES.map((z): [string, ZoneItem] => [z.id, z]));
+export const getZone = (id: string) => zoneById.get(id);
 
 /* ════════ Ids ════════ */
 
@@ -114,6 +117,31 @@ export function presetToDesign(presetId: string): WorkspaceDesign {
   return { ...base, stations: [station] };
 }
 
+/* ════════ Zones ════════ */
+
+const ZONE_SPOTS = [
+  { x: 0.12, y: 0.55 }, { x: 0.88, y: 0.55 },
+  { x: 0.09, y: 0.24 }, { x: 0.91, y: 0.24 },
+  { x: 0.28, y: 0.82 }, { x: 0.72, y: 0.82 },
+];
+
+export function zoneCount(design: WorkspaceDesign, zoneId: string): number {
+  return design.zones.filter(z => z.zoneId === zoneId).length;
+}
+
+export function addZone(design: WorkspaceDesign, zoneId: string): WorkspaceDesign {
+  if (!zoneById.has(zoneId) || zoneCount(design, zoneId) > 0) return design;
+  const spot = ZONE_SPOTS[design.zones.length % ZONE_SPOTS.length];
+  const placed: PlacedZone = { uid: uid('zone'), zoneId, spot: { ...spot }, pinned: false };
+  return { ...design, zones: [...design.zones, placed] };
+}
+
+export function removeZone(design: WorkspaceDesign, zoneId: string): WorkspaceDesign {
+  const idx = design.zones.findIndex(z => z.zoneId === zoneId);
+  if (idx === -1) return design;
+  return { ...design, zones: design.zones.filter((_, i) => i !== idx) };
+}
+
 /* ════════ Pricing ════════ */
 
 export function stationTotal(station: Station): Price {
@@ -125,7 +153,9 @@ export function stationTotal(station: Station): Price {
 }
 
 export function designTotal(design: WorkspaceDesign): Price {
-  return design.stations.reduce((sum, s) => sum + stationTotal(s), 0);
+  const stations = design.stations.reduce((sum, s) => sum + stationTotal(s), 0);
+  const zones = design.zones.reduce((sum, z) => sum + (zoneById.get(z.zoneId)?.price ?? 0), 0);
+  return stations + zones;
 }
 
 /* ════════ Auto-layout ════════

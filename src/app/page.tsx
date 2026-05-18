@@ -4,7 +4,8 @@ import { useState, useMemo, useEffect } from 'react';
 import type { WorkspaceDesign, SavedDesign, EnvironmentConfig } from '@/model/types';
 import {
   emptyDesign, editStation, setStationCount, presetToDesign,
-  designTotal, addDevice, removeDevice, getDesk, getSeating, getDevice,
+  designTotal, addDevice, removeDevice, addZone, removeZone,
+  getDesk, getSeating, getDevice, getZone,
 } from '@/model/design';
 import WorkspaceCanvas from '@/components/WorkspaceCanvas';
 import SelectorPanel from '@/components/SelectorPanel';
@@ -57,6 +58,8 @@ export default function Page() {
   const handleReset = () => setDesign(emptyDesign());
   const handleEnv = (patch: Partial<EnvironmentConfig>) =>
     setDesign(d => ({ ...d, environment: { ...d.environment, ...patch } }));
+  const handleZone = (zoneId: string, delta: number) =>
+    setDesign(d => (delta > 0 ? addZone(d, zoneId) : removeZone(d, zoneId)));
 
   const handleSave = () => {
     const name = saveName.trim() ||
@@ -166,9 +169,11 @@ export default function Page() {
         }}>
           <SelectorPanel
             station={template}
+            zones={design.zones}
             onDeskChange={handleDesk}
             onSeatingChange={handleSeating}
             onDeviceChange={handleDevice}
+            onZoneChange={handleZone}
           />
         </aside>
 
@@ -216,13 +221,17 @@ export default function Page() {
 
           {/* Bottom bar */}
           <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 8, minHeight: 34 }}>
-            {(desk || seating || deviceCounts.length > 0) ? (
+            {(desk || seating || deviceCounts.length > 0 || design.zones.length > 0) ? (
               <div style={{ flex: 1, display: 'flex', gap: 5, overflow: 'hidden', flexWrap: 'nowrap' }}>
                 {desk && <InfoChip label={desk.name} sub="desk" color={desk.spec.surfaceColor} />}
                 {seating && <InfoChip label={seating.name} sub="chair" color={seating.spec.seatColor} />}
                 {deviceCounts.map(([id, n]) => {
                   const dev = getDevice(id);
                   return dev ? <InfoChip key={id} label={dev.name} sub={`×${n}`} color={dev.spec.accentColor} /> : null;
+                })}
+                {design.zones.map(z => {
+                  const zone = getZone(z.zoneId);
+                  return zone ? <InfoChip key={z.uid} label={zone.name} sub="zone" color={zone.spec.palette[0]} /> : null;
                 })}
               </div>
             ) : (

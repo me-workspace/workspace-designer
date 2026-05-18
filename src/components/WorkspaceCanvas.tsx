@@ -1,11 +1,12 @@
 'use client';
 
 import type { WorkspaceDesign, Station } from '@/model/types';
-import { getDesk, getSeating, getDevice, layoutStation } from '@/model/design';
+import { getDesk, getSeating, getDevice, getZone, layoutStation } from '@/model/design';
 import { resolveEnvironment, type ResolvedEnv } from '@/model/environment';
 import DeskGlyph from './glyphs/DeskGlyph';
 import SeatingGlyph from './glyphs/SeatingGlyph';
 import DeviceGlyph from './glyphs/DeviceGlyph';
+import ZoneGlyph from './glyphs/ZoneGlyph';
 
 interface Props {
   design: WorkspaceDesign;
@@ -45,7 +46,8 @@ export default function WorkspaceCanvas({ design }: Props) {
   const re = resolveEnvironment(design.environment);
   const template = design.stations[0];
   const teamSize = design.stations.length;
-  const isEmpty = !template.deskId && !template.seatingId;
+  const hasStations = !!template.deskId || !!template.seatingId;
+  const isEmpty = !hasStations && design.zones.length === 0;
   const slots = buildSlots(teamSize).sort((a, b) => b.d - a.d);
   const baseH = teamSize === 1 ? 74 : 60;
 
@@ -112,7 +114,7 @@ export default function WorkspaceCanvas({ design }: Props) {
       )}
 
       {/* Workstations */}
-      {!isEmpty && slots.map(s => {
+      {hasStations && slots.map(s => {
         const scale = 0.42 + Math.pow(1 - s.d, 1.4) * 0.58;
         const bottom = 2.5 + (1 - Math.pow(1 - s.d, 1.85)) * 36;
         const blur = s.d > 0.62 ? (s.d - 0.62) * 4 : 0;
@@ -127,6 +129,29 @@ export default function WorkspaceCanvas({ design }: Props) {
           }}>
             <div className="animate-rise-in" style={{ position: 'relative', width: '100%', height: '100%', animationDelay: `${s.idx * 0.06}s` }}>
               <Workstation station={station} />
+            </div>
+          </div>
+        );
+      })}
+
+      {/* Zones */}
+      {design.zones.map(pz => {
+        const zone = getZone(pz.zoneId);
+        if (!zone) return null;
+        const depth = pz.spot.y;
+        const scale = (0.5 + (1 - depth) * 0.5) * (0.7 + zone.spec.footprint.w);
+        const bottom = 3 + (1 - Math.pow(1 - depth, 1.85)) * 40;
+        const blur = depth > 0.66 ? (depth - 0.66) * 5 : 0;
+        return (
+          <div key={pz.uid} style={{
+            position: 'absolute', left: `${pz.spot.x * 100}%`, bottom: `${bottom}%`,
+            height: '40%', aspectRatio: '1.1',
+            transform: `translateX(-50%) scale(${scale})`, transformOrigin: 'bottom center',
+            zIndex: Math.round((1 - depth) * 100) + 10,
+            filter: `brightness(${1 - depth * 0.34}) saturate(${1 - depth * 0.24})${blur ? ` blur(${blur}px)` : ''}`,
+          }}>
+            <div className="animate-rise-in" style={{ position: 'relative', width: '100%', height: '100%' }}>
+              <ZoneGlyph spec={zone.spec} />
             </div>
           </div>
         );

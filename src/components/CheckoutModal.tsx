@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import type { WorkspaceDesign } from '@/model/types';
-import { getDesk, getSeating, getDevice, stationTotal, designTotal } from '@/model/design';
+import { getDesk, getSeating, getDevice, getZone, stationTotal, designTotal } from '@/model/design';
 
 interface Props {
   design: WorkspaceDesign;
@@ -20,18 +20,27 @@ export default function CheckoutModal({ design, onClose }: Props) {
   const teamSize = design.stations.length;
   const perStation = stationTotal(station);
   const total = designTotal(design);
+  const stationsSubtotal = perStation * teamSize;
 
-  const items: { name: string; price: number; qty: number }[] = [];
+  const stationItems: { name: string; price: number; qty: number }[] = [];
   const desk = getDesk(station.deskId);
-  if (desk) items.push({ name: `${desk.name} Desk`, price: desk.price, qty: 1 });
+  if (desk) stationItems.push({ name: `${desk.name} Desk`, price: desk.price, qty: 1 });
   const seating = getSeating(station.seatingId);
-  if (seating) items.push({ name: `${seating.name} Chair`, price: seating.price, qty: 1 });
+  if (seating) stationItems.push({ name: `${seating.name} Chair`, price: seating.price, qty: 1 });
   const counts = new Map<string, number>();
   for (const d of station.devices) counts.set(d.deviceId, (counts.get(d.deviceId) ?? 0) + 1);
   counts.forEach((n, id) => {
     const dev = getDevice(id);
-    if (dev) items.push({ name: dev.name, price: dev.price, qty: n });
+    if (dev) stationItems.push({ name: dev.name, price: dev.price, qty: n });
   });
+
+  const zoneItems: { name: string; price: number }[] = [];
+  for (const z of design.zones) {
+    const zone = getZone(z.zoneId);
+    if (zone) zoneItems.push({ name: zone.name, price: zone.price });
+  }
+  const zonesTotal = zoneItems.reduce((s, z) => s + z.price, 0);
+  const empty = stationItems.length === 0 && zoneItems.length === 0;
 
   const handleRent = () => {
     setLoading(true);
@@ -79,49 +88,43 @@ export default function CheckoutModal({ design, onClose }: Props) {
             </div>
 
             {/* Line items */}
-            <div style={{ padding: '14px 20px', maxHeight: 220, overflowY: 'auto' }}>
-              {items.length === 0 ? (
+            <div style={{ padding: '14px 20px', maxHeight: 240, overflowY: 'auto' }}>
+              {empty ? (
                 <p style={{ fontSize: 12, color: '#71717a', textAlign: 'center', padding: '16px 0' }}>
                   Nothing selected yet.
                 </p>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  {teamSize > 1 && (
-                    <p style={{ fontSize: 10, fontWeight: 700, color: '#52525b', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 2 }}>
-                      Per workspace
-                    </p>
+                  {stationItems.length > 0 && (
+                    <SectionLabel>{teamSize > 1 ? 'Per workspace' : 'Workspace'}</SectionLabel>
                   )}
-                  {items.map((item, i) => (
-                    <div key={i} style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8 }}>
-                      <span style={{ fontSize: 12, color: '#d4d4d8' }}>
-                        {item.qty > 1 && <span style={{ color: '#52525b', marginRight: 4 }}>{item.qty}×</span>}
-                        {item.name}
-                      </span>
-                      <span style={{ fontSize: 11, color: '#71717a', flexShrink: 0 }}>
-                        {idr(item.price * item.qty)}<span style={{ fontSize: 9 }}>/mo</span>
-                      </span>
-                    </div>
+                  {stationItems.map((item, i) => (
+                    <LineRow key={`s${i}`} name={item.name} qty={item.qty} amount={item.price * item.qty} />
                   ))}
+                  {zoneItems.length > 0 && (
+                    <>
+                      <SectionLabel>Shared zones</SectionLabel>
+                      {zoneItems.map((z, i) => (
+                        <LineRow key={`z${i}`} name={z.name} qty={1} amount={z.price} />
+                      ))}
+                    </>
+                  )}
                 </div>
               )}
             </div>
 
-            {/* Total + CTA */}
+            {/* Totals + CTA */}
             <div style={{ padding: '14px 20px 20px', borderTop: '1px solid #2c2c2f' }}>
-              <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: teamSize > 1 ? 6 : 16 }}>
-                <span style={{ fontSize: 12, color: '#71717a' }}>Per workspace</span>
-                <span style={{ fontSize: 13, fontWeight: 700, color: '#f2f2f7' }}>
-                  {idr(perStation)}<span style={{ fontSize: 9, color: '#52525b', fontWeight: 400 }}>/mo</span>
+              <TotalRow label="Per workspace" amount={perStation} />
+              {teamSize > 1 && <TotalRow label={`× ${teamSize} workspaces`} amount={stationsSubtotal} />}
+              {zoneItems.length > 0 && <TotalRow label={`Shared zones (${zoneItems.length})`} amount={zonesTotal} />}
+
+              <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', margin: '10px 0 14px', paddingTop: 10, borderTop: '1px solid #2c2c2f' }}>
+                <span style={{ fontSize: 13, fontWeight: 800, color: '#f2f2f7' }}>Total</span>
+                <span style={{ fontSize: 19, fontWeight: 800, color: '#4ade80' }}>
+                  {idr(total)}<span style={{ fontSize: 9, color: '#52525b', fontWeight: 400 }}>/mo</span>
                 </span>
               </div>
-              {teamSize > 1 && (
-                <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 16 }}>
-                  <span style={{ fontSize: 13, fontWeight: 700, color: '#f2f2f7' }}>Total × {teamSize} workspaces</span>
-                  <span style={{ fontSize: 18, fontWeight: 800, color: '#4ade80' }}>
-                    {idr(total)}<span style={{ fontSize: 9, color: '#52525b', fontWeight: 400 }}>/mo</span>
-                  </span>
-                </div>
-              )}
 
               <p style={{ fontSize: 10, color: '#52525b', marginBottom: 14, lineHeight: 1.5 }}>
                 Free delivery anywhere in Bali · Cancel anytime with 7 days notice · Swap items monthly
@@ -129,12 +132,12 @@ export default function CheckoutModal({ design, onClose }: Props) {
 
               <button
                 onClick={handleRent}
-                disabled={items.length === 0 || loading}
+                disabled={empty || loading}
                 style={{
                   width: '100%', padding: '12px 0', borderRadius: 10,
-                  background: items.length > 0 && !loading ? '#4ade80' : '#2c2c2f',
-                  color: items.length > 0 && !loading ? '#09090b' : '#3f3f46',
-                  border: 'none', cursor: items.length === 0 ? 'not-allowed' : 'pointer',
+                  background: !empty && !loading ? '#4ade80' : '#2c2c2f',
+                  color: !empty && !loading ? '#09090b' : '#3f3f46',
+                  border: 'none', cursor: empty ? 'not-allowed' : 'pointer',
                   fontSize: 13, fontWeight: 800, letterSpacing: '0.01em', transition: 'all 0.15s',
                 }}
               >
@@ -153,6 +156,39 @@ export default function CheckoutModal({ design, onClose }: Props) {
           </>
         )}
       </div>
+    </div>
+  );
+}
+
+function SectionLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <p style={{ fontSize: 10, fontWeight: 700, color: '#52525b', letterSpacing: '0.08em', textTransform: 'uppercase', marginTop: 2 }}>
+      {children}
+    </p>
+  );
+}
+
+function LineRow({ name, qty, amount }: { name: string; qty: number; amount: number }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8 }}>
+      <span style={{ fontSize: 12, color: '#d4d4d8' }}>
+        {qty > 1 && <span style={{ color: '#52525b', marginRight: 4 }}>{qty}×</span>}
+        {name}
+      </span>
+      <span style={{ fontSize: 11, color: '#71717a', flexShrink: 0 }}>
+        {idr(amount)}<span style={{ fontSize: 9 }}>/mo</span>
+      </span>
+    </div>
+  );
+}
+
+function TotalRow({ label, amount }: { label: string; amount: number }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 5 }}>
+      <span style={{ fontSize: 12, color: '#71717a' }}>{label}</span>
+      <span style={{ fontSize: 12, fontWeight: 600, color: '#a1a1aa' }}>
+        {idr(amount)}<span style={{ fontSize: 9, color: '#52525b' }}>/mo</span>
+      </span>
     </div>
   );
 }

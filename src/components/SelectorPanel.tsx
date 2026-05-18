@@ -1,15 +1,17 @@
 'use client';
 
 import { useState } from 'react';
-import type { DeskItem, SeatingItem, DeviceItem, DeviceGroup, Station } from '@/model/types';
-import { DESKS, SEATING, DEVICES } from '@/data/catalog';
+import type { DeskItem, SeatingItem, DeviceItem, ZoneItem, DeviceGroup, PlacedZone, Station } from '@/model/types';
+import { DESKS, SEATING, DEVICES, ZONES } from '@/data/catalog';
 import { deviceCount } from '@/model/design';
 
 interface Props {
   station: Station;
+  zones: PlacedZone[];
   onDeskChange: (deskId: string) => void;
   onSeatingChange: (seatingId: string) => void;
   onDeviceChange: (deviceId: string, delta: number) => void;
+  onZoneChange: (zoneId: string, delta: number) => void;
 }
 
 const idr = (n: number) =>
@@ -25,7 +27,7 @@ const SHAPE_ICON: Record<DeskItem['spec']['shape'], string> = {
   'straight': '▭', 'l-shaped': '⌐', 'u-shaped': '⊐',
 };
 
-export default function SelectorPanel({ station, onDeskChange, onSeatingChange, onDeviceChange }: Props) {
+export default function SelectorPanel({ station, zones, onDeskChange, onSeatingChange, onDeviceChange, onZoneChange }: Props) {
   const [query, setQuery] = useState('');
   const [collapsed, setCollapsed] = useState<Set<DeviceGroup>>(
     () => new Set(GROUP_ORDER.filter(g => g !== 'display')),
@@ -41,8 +43,10 @@ export default function SelectorPanel({ station, onDeskChange, onSeatingChange, 
   const deviceGroups = GROUP_ORDER
     .map(g => ({ group: g, items: DEVICES.filter(d => d.spec.group === g && matches(d)) }))
     .filter(g => g.items.length > 0);
+  const zoneList = ZONES.filter(matches);
+  const zc = (id: string) => zones.filter(z => z.zoneId === id).length;
 
-  const nothing = searching && !desks.length && !seats.length && !deviceGroups.length;
+  const nothing = searching && !desks.length && !seats.length && !deviceGroups.length && !zoneList.length;
   const step1Done = !!station.deskId;
   const step2Done = !!station.seatingId;
 
@@ -195,7 +199,61 @@ export default function SelectorPanel({ station, onDeskChange, onSeatingChange, 
         </StepSection>
       )}
 
+      {/* Zones */}
+      {zoneList.length > 0 && (
+        <>
+          <Divider />
+          <StepSection step={4} label="Zones" hint={searching ? `${zoneList.length} match` : 'Build out the room'}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+              {zoneList.map(zone => (
+                <ZoneCard
+                  key={zone.id}
+                  zone={zone}
+                  added={zc(zone.id) > 0}
+                  onAdd={() => onZoneChange(zone.id, 1)}
+                  onRemove={() => onZoneChange(zone.id, -1)}
+                />
+              ))}
+            </div>
+          </StepSection>
+        </>
+      )}
+
       <div style={{ height: 16 }} />
+    </div>
+  );
+}
+
+function ZoneCard({ zone, added, onAdd, onRemove }: {
+  zone: ZoneItem; added: boolean; onAdd: () => void; onRemove: () => void;
+}) {
+  return (
+    <div style={{
+      background: added ? 'rgba(74,222,128,0.05)' : '#111113',
+      border: `1.5px solid ${added ? 'rgba(74,222,128,0.25)' : '#1f1f22'}`,
+      borderRadius: 9, padding: '8px 10px',
+      display: 'flex', alignItems: 'center', gap: 8, transition: 'all 0.15s',
+    }}>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 5 }}>
+          <span style={{ fontSize: 11, fontWeight: 700, color: added ? '#d4d4d8' : '#a1a1aa' }}>{zone.name}</span>
+          <span style={{ fontSize: 9, color: '#52525b' }}>{idr(zone.price)}/mo</span>
+        </div>
+        <p style={{ fontSize: 9, color: '#52525b', marginTop: 1, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
+          {zone.tagline}
+        </p>
+      </div>
+      <button
+        onClick={added ? onRemove : onAdd}
+        style={{
+          flexShrink: 0, padding: '5px 10px', borderRadius: 7, fontSize: 10, fontWeight: 700, cursor: 'pointer',
+          background: added ? 'rgba(74,222,128,0.14)' : '#1c1c1f',
+          border: `1px solid ${added ? 'rgba(74,222,128,0.35)' : '#2c2c2f'}`,
+          color: added ? '#4ade80' : '#a1a1aa',
+        }}
+      >
+        {added ? '✓ Added' : 'Add'}
+      </button>
     </div>
   );
 }
