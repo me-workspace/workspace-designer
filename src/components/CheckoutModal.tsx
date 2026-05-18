@@ -1,0 +1,182 @@
+'use client';
+
+import type { WorkspaceSelection } from '@/types';
+import { useState } from 'react';
+
+interface Props {
+  selection: WorkspaceSelection;
+  total: number;
+  qty: number;
+  onClose: () => void;
+}
+
+const idr = (n: number) =>
+  new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(n);
+
+export default function CheckoutModal({ selection, total, qty, onClose }: Props) {
+  const [submitted, setSubmitted] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  const items = [
+    ...(selection.desk ? [{ name: `${selection.desk.name} Desk`, price: selection.desk.price, qty: 1 }] : []),
+    ...(selection.chair ? [{ name: `${selection.chair.name} Chair`, price: selection.chair.price, qty: 1 }] : []),
+    ...Object.values(selection.accessories).map(({ item, quantity }) => ({
+      name: item.name, price: item.price, qty: quantity,
+    })),
+  ];
+
+  const handleRent = () => {
+    setLoading(true);
+    setTimeout(() => { setLoading(false); setSubmitted(true); }, 1400);
+  };
+
+  return (
+    <div
+      style={{
+        position: 'fixed', inset: 0, zIndex: 50,
+        display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16,
+        background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(6px)',
+      }}
+      onClick={e => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div className="animate-slide-up" style={{
+        width: '100%', maxWidth: 420,
+        background: '#1c1c1f', borderRadius: 18,
+        border: '1px solid #2c2c2f',
+        overflow: 'hidden',
+        boxShadow: '0 32px 80px rgba(0,0,0,0.6)',
+      }}>
+        {submitted ? (
+          <SuccessView onClose={onClose} />
+        ) : (
+          <>
+            {/* Header */}
+            <div style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              padding: '20px 20px 16px', borderBottom: '1px solid #2c2c2f',
+            }}>
+              <div>
+                <h2 style={{ fontSize: 16, fontWeight: 800, color: '#f2f2f7' }}>Your Setup</h2>
+                <p style={{ fontSize: 11, color: '#71717a', marginTop: 2 }}>Review before renting</p>
+              </div>
+              <button
+                onClick={onClose}
+                style={{
+                  width: 30, height: 30, borderRadius: 8,
+                  background: '#2c2c2f', border: 'none', cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  color: '#71717a', fontSize: 14, fontWeight: 700,
+                }}
+              >✕</button>
+            </div>
+
+            {/* Line items */}
+            <div style={{ padding: '14px 20px', maxHeight: 220, overflowY: 'auto' }}>
+              {items.length === 0 ? (
+                <p style={{ fontSize: 12, color: '#71717a', textAlign: 'center', padding: '16px 0' }}>
+                  Nothing selected yet.
+                </p>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {items.map((item, i) => (
+                    <div key={i} style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8 }}>
+                      <span style={{ fontSize: 12, color: '#d4d4d8' }}>
+                        {item.qty > 1 && <span style={{ color: '#52525b', marginRight: 4 }}>{item.qty}×</span>}
+                        {item.name}
+                      </span>
+                      <span style={{ fontSize: 11, color: '#71717a', flexShrink: 0 }}>
+                        {idr(item.price * item.qty)}<span style={{ fontSize: 9 }}>/mo</span>
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Total + CTA */}
+            <div style={{ padding: '14px 20px 20px', borderTop: '1px solid #2c2c2f' }}>
+              <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: qty > 1 ? 6 : 16 }}>
+                <span style={{ fontSize: 12, color: '#71717a' }}>Per workspace</span>
+                <span style={{ fontSize: 13, fontWeight: 700, color: '#f2f2f7' }}>
+                  {idr(total)}<span style={{ fontSize: 9, color: '#52525b', fontWeight: 400 }}>/mo</span>
+                </span>
+              </div>
+              {qty > 1 && (
+                <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 16 }}>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: '#f2f2f7' }}>
+                    Total × {qty} workspaces
+                  </span>
+                  <span style={{ fontSize: 18, fontWeight: 800, color: '#4ade80' }}>
+                    {idr(total * qty)}<span style={{ fontSize: 9, color: '#52525b', fontWeight: 400 }}>/mo</span>
+                  </span>
+                </div>
+              )}
+
+              <p style={{ fontSize: 10, color: '#52525b', marginBottom: 14, lineHeight: 1.5 }}>
+                Free delivery anywhere in Bali · Cancel anytime with 7 days notice · Swap items monthly
+              </p>
+
+              <button
+                onClick={handleRent}
+                disabled={items.length === 0 || loading}
+                style={{
+                  width: '100%', padding: '12px 0', borderRadius: 10,
+                  background: items.length > 0 && !loading ? '#4ade80' : '#2c2c2f',
+                  color: items.length > 0 && !loading ? '#09090b' : '#3f3f46',
+                  border: 'none', cursor: items.length === 0 ? 'not-allowed' : 'pointer',
+                  fontSize: 13, fontWeight: 800, letterSpacing: '0.01em',
+                  transition: 'all 0.15s',
+                }}
+              >
+                {loading ? (
+                  <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                    <svg className="animate-spin" width="15" height="15" viewBox="0 0 15 15" fill="none">
+                      <circle cx="7.5" cy="7.5" r="5.5" stroke="#09090b" strokeWidth="2" strokeDasharray="25" strokeDashoffset="8" />
+                    </svg>
+                    Processing…
+                  </span>
+                ) : (
+                  `Rent ${qty > 1 ? `${qty} Workspaces` : 'My Setup'} →`
+                )}
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function SuccessView({ onClose }: { onClose: () => void }) {
+  return (
+    <div className="animate-fade-up" style={{ padding: '40px 24px', textAlign: 'center' }}>
+      <div style={{
+        width: 52, height: 52, borderRadius: '50%',
+        background: 'rgba(74,222,128,0.12)',
+        border: '1.5px solid rgba(74,222,128,0.3)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        margin: '0 auto 16px', color: '#4ade80', fontSize: 22, fontWeight: 700,
+      }}>✓</div>
+      <h2 style={{ fontSize: 18, fontWeight: 800, color: '#f2f2f7', marginBottom: 8 }}>
+        You&apos;re all set!
+      </h2>
+      <p style={{ fontSize: 12, color: '#71717a', lineHeight: 1.6, marginBottom: 6 }}>
+        Your workspace is reserved. Our team will reach out within 24 hours to confirm delivery.
+      </p>
+      <p style={{ fontSize: 11, color: '#52525b', marginBottom: 28 }}>
+        Questions? hello@monis.rent
+      </p>
+      <button
+        onClick={onClose}
+        style={{
+          padding: '10px 24px', borderRadius: 10,
+          background: '#4ade80', color: '#09090b',
+          border: 'none', cursor: 'pointer',
+          fontSize: 12, fontWeight: 800,
+        }}
+      >
+        Back to designer
+      </button>
+    </div>
+  );
+}
