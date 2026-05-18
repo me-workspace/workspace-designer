@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
-import type { WorkspaceDesign, SavedDesign } from '@/model/types';
+import type { WorkspaceDesign, SavedDesign, EnvironmentConfig } from '@/model/types';
 import {
   emptyDesign, editStation, setStationCount, presetToDesign,
   designTotal, addDevice, removeDevice, getDesk, getSeating, getDevice,
@@ -10,6 +10,7 @@ import WorkspaceCanvas from '@/components/WorkspaceCanvas';
 import SelectorPanel from '@/components/SelectorPanel';
 import CheckoutModal from '@/components/CheckoutModal';
 import PackagesPanel from '@/components/PackagesPanel';
+import EnvironmentPanel from '@/components/EnvironmentPanel';
 
 const TEAM_OPTIONS = [1, 3, 5, 10] as const;
 const STORAGE_KEY = 'monis_designs_v2';
@@ -20,7 +21,7 @@ const idr = (n: number) =>
 export default function Page() {
   const [design, setDesign] = useState<WorkspaceDesign>(emptyDesign);
   const [showCheckout, setShowCheckout] = useState(false);
-  const [showPackages, setShowPackages] = useState(false);
+  const [rightPanel, setRightPanel] = useState<'none' | 'packages' | 'scene'>('none');
   const [savedDesigns, setSavedDesigns] = useState<SavedDesign[]>([]);
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const [saveName, setSaveName] = useState('');
@@ -54,6 +55,8 @@ export default function Page() {
   const handlePreset = (presetId: string) => setDesign(presetToDesign(presetId));
   const handleTeamSize = (n: number) => setDesign(d => setStationCount(d, n));
   const handleReset = () => setDesign(emptyDesign());
+  const handleEnv = (patch: Partial<EnvironmentConfig>) =>
+    setDesign(d => ({ ...d, environment: { ...d.environment, ...patch } }));
 
   const handleSave = () => {
     const name = saveName.trim() ||
@@ -62,10 +65,10 @@ export default function Page() {
     persistSaved([sd, ...savedDesigns]);
     setSaveDialogOpen(false);
     setSaveName('');
-    setShowPackages(true);
+    setRightPanel('packages');
   };
   const handleDelete = (id: string) => persistSaved(savedDesigns.filter(s => s.id !== id));
-  const handleLoad = (sd: SavedDesign) => { setDesign(sd.design); setShowPackages(false); };
+  const handleLoad = (sd: SavedDesign) => { setDesign(sd.design); setRightPanel('none'); };
 
   const canCheckout = !!template.deskId || !!template.seatingId;
   const desk = getDesk(template.deskId);
@@ -113,12 +116,24 @@ export default function Page() {
             </button>
           )}
           <button
-            onClick={() => setShowPackages(p => !p)}
+            onClick={() => setRightPanel(p => (p === 'scene' ? 'none' : 'scene'))}
             style={{
               padding: '5px 12px', borderRadius: 8, fontSize: 12, fontWeight: 600,
-              background: showPackages ? 'rgba(74,222,128,0.1)' : '#1c1c1f',
-              color: showPackages ? '#4ade80' : '#a1a1aa',
-              border: `1px solid ${showPackages ? 'rgba(74,222,128,0.25)' : '#2c2c2f'}`,
+              background: rightPanel === 'scene' ? 'rgba(74,222,128,0.1)' : '#1c1c1f',
+              color: rightPanel === 'scene' ? '#4ade80' : '#a1a1aa',
+              border: `1px solid ${rightPanel === 'scene' ? 'rgba(74,222,128,0.25)' : '#2c2c2f'}`,
+              cursor: 'pointer', transition: 'all 0.15s',
+            }}
+          >
+            Scene
+          </button>
+          <button
+            onClick={() => setRightPanel(p => (p === 'packages' ? 'none' : 'packages'))}
+            style={{
+              padding: '5px 12px', borderRadius: 8, fontSize: 12, fontWeight: 600,
+              background: rightPanel === 'packages' ? 'rgba(74,222,128,0.1)' : '#1c1c1f',
+              color: rightPanel === 'packages' ? '#4ade80' : '#a1a1aa',
+              border: `1px solid ${rightPanel === 'packages' ? 'rgba(74,222,128,0.25)' : '#2c2c2f'}`,
               cursor: 'pointer', transition: 'all 0.15s',
             }}
           >
@@ -262,18 +277,22 @@ export default function Page() {
           </div>
         </main>
 
-        {/* Right: Packages */}
-        {showPackages && (
+        {/* Right panel */}
+        {rightPanel !== 'none' && (
           <aside style={{
             width: 264, flexShrink: 0, borderLeft: '1px solid #1f1f22',
             background: '#0d0d10', overflow: 'hidden', display: 'flex', flexDirection: 'column',
           }}>
-            <PackagesPanel
-              savedDesigns={savedDesigns}
-              onApplyPreset={handlePreset}
-              onLoad={handleLoad}
-              onDelete={handleDelete}
-            />
+            {rightPanel === 'packages' ? (
+              <PackagesPanel
+                savedDesigns={savedDesigns}
+                onApplyPreset={handlePreset}
+                onLoad={handleLoad}
+                onDelete={handleDelete}
+              />
+            ) : (
+              <EnvironmentPanel environment={design.environment} onChange={handleEnv} />
+            )}
           </aside>
         )}
       </div>

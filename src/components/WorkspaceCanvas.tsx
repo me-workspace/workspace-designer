@@ -2,6 +2,7 @@
 
 import type { WorkspaceDesign, Station } from '@/model/types';
 import { getDesk, getSeating, getDevice, layoutStation } from '@/model/design';
+import { resolveEnvironment, type ResolvedEnv } from '@/model/environment';
 import DeskGlyph from './glyphs/DeskGlyph';
 import SeatingGlyph from './glyphs/SeatingGlyph';
 import DeviceGlyph from './glyphs/DeviceGlyph';
@@ -41,6 +42,7 @@ function buildSlots(qty: number): Slot[] {
 }
 
 export default function WorkspaceCanvas({ design }: Props) {
+  const re = resolveEnvironment(design.environment);
   const template = design.stations[0];
   const teamSize = design.stations.length;
   const isEmpty = !template.deskId && !template.seatingId;
@@ -61,38 +63,38 @@ export default function WorkspaceCanvas({ design }: Props) {
   ].filter(Boolean).join('   ·   ');
 
   return (
-    <div style={{ position: 'relative', width: '100%', height: '100%', overflow: 'hidden', borderRadius: 12, background: '#0e0a07' }}>
+    <div style={{ position: 'relative', width: '100%', height: '100%', overflow: 'hidden', borderRadius: 12, background: re.rootBg }}>
 
       {/* Wall */}
-      <div style={{ position: 'absolute', inset: '0 0 63% 0', background: 'linear-gradient(180deg,#241b14 0%,#1a130d 100%)' }}>
-        <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse at 82% 6%, rgba(255,150,70,0.26) 0%, transparent 62%)' }} />
+      <div style={{ position: 'absolute', inset: '0 0 63% 0', background: `linear-gradient(180deg,${re.wall[0]} 0%,${re.wall[1]} 100%)` }}>
+        <div style={{ position: 'absolute', inset: 0, background: `radial-gradient(ellipse at 82% 6%, ${re.wallWash} 0%, transparent 62%)` }} />
         <div style={{
           position: 'absolute', inset: 0,
-          backgroundImage: 'linear-gradient(rgba(255,200,150,0.016) 1px,transparent 1px),linear-gradient(90deg,rgba(255,200,150,0.016) 1px,transparent 1px)',
+          backgroundImage: 'linear-gradient(rgba(255,255,255,0.014) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.014) 1px,transparent 1px)',
           backgroundSize: '58px 58px',
         }} />
       </div>
 
       {/* Horizon */}
-      <div style={{ position: 'absolute', top: '37%', left: 0, right: 0, height: '1px', background: 'linear-gradient(90deg,transparent,rgba(255,165,85,0.55),transparent)' }} />
-      <div style={{ position: 'absolute', top: '37%', left: 0, right: 0, height: '13%', background: 'linear-gradient(180deg,rgba(255,140,60,0.12),transparent)', pointerEvents: 'none' }} />
+      <div style={{ position: 'absolute', top: '37%', left: 0, right: 0, height: '1px', background: `linear-gradient(90deg,transparent,${re.horizon},transparent)` }} />
+      <div style={{ position: 'absolute', top: '37%', left: 0, right: 0, height: '13%', background: `linear-gradient(180deg,${re.lightPool},transparent)`, pointerEvents: 'none' }} />
 
       {/* Floor */}
-      <div style={{ position: 'absolute', inset: '37% 0 0 0', background: 'linear-gradient(180deg,#17110b 0%,#0b0805 100%)' }}>
-        <PerspectiveFloor />
-        <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse at 70% -4%, rgba(255,150,70,0.16) 0%, transparent 56%)' }} />
+      <div style={{ position: 'absolute', inset: '37% 0 0 0', background: `linear-gradient(180deg,${re.floor[0]} 0%,${re.floor[1]} 100%)` }}>
+        <PerspectiveFloor color={re.floorGrid} />
+        <div style={{ position: 'absolute', inset: 0, background: `radial-gradient(ellipse at 70% -4%, ${re.lightPool} 0%, transparent 56%)` }} />
       </div>
 
       {/* Baseboard */}
-      <div style={{ position: 'absolute', top: '36.3%', left: 0, right: 0, height: '7px', background: 'linear-gradient(180deg,#2c2117,#1a130d)' }} />
+      <div style={{ position: 'absolute', top: '36.3%', left: 0, right: 0, height: '7px', background: re.baseboard }} />
 
-      <SunsetWindow />
+      <EnvWindow w={re.window} />
       <WallArt />
 
       {/* Sun beam */}
       <div style={{
         position: 'absolute', top: 0, right: '4%', width: '52%', height: '100%',
-        background: 'linear-gradient(202deg, rgba(255,170,90,0.13) 0%, transparent 44%)',
+        background: `linear-gradient(202deg, ${re.beam} 0%, transparent 44%)`,
         transform: 'skewX(-13deg)', transformOrigin: 'top right', pointerEvents: 'none',
       }} />
 
@@ -152,7 +154,7 @@ export default function WorkspaceCanvas({ design }: Props) {
         </div>
       )}
 
-      <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 250, boxShadow: 'inset 0 0 90px rgba(0,0,0,0.55)' }} />
+      <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 250, boxShadow: `inset 0 0 90px rgba(0,0,0,${re.vignette})` }} />
     </div>
   );
 }
@@ -166,17 +168,14 @@ function Workstation({ station }: { station: Station }) {
 
   return (
     <div style={{ position: 'absolute', inset: 0 }}>
-      {/* contact shadow */}
       <div style={{ position: 'absolute', bottom: '-2%', left: '7%', right: '7%', height: '10%', background: 'radial-gradient(ellipse,rgba(0,0,0,0.62) 0%,transparent 70%)' }} />
 
-      {/* desk */}
       {desk && (
         <div style={{ position: 'absolute', left: '1%', right: '1%', top: 0, height: '56%' }}>
           <DeskGlyph spec={desk.spec} />
         </div>
       )}
 
-      {/* devices on the surface */}
       {desk && (
         <div style={{ position: 'absolute', left: '5%', right: '5%', top: '2%', height: '42%' }}>
           {laid.map(ld => (
@@ -191,7 +190,6 @@ function Workstation({ station }: { station: Station }) {
         </div>
       )}
 
-      {/* chair */}
       {seating && (
         <div style={{ position: 'absolute', bottom: '1%', left: '50%', transform: 'translateX(-50%)', width: '24%', height: '50%' }}>
           <SeatingGlyph spec={seating.spec} />
@@ -203,44 +201,49 @@ function Workstation({ station }: { station: Station }) {
 
 /* ════════ Room pieces ════════ */
 
-function PerspectiveFloor() {
+function PerspectiveFloor({ color }: { color: string }) {
   const rays = [-45, -18, 2, 18, 32, 50, 68, 82, 98, 118, 145];
   const depths = [1, 2, 3, 4, 5, 6].map(i => 100 * (1 - Math.pow(1 - i / 6, 1.85)));
   return (
     <svg viewBox="0 0 100 100" preserveAspectRatio="none" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}>
       {rays.map((x, i) => (
-        <line key={`r${i}`} x1={x} y1={100} x2={50} y2={0} stroke="rgba(255,170,90,0.11)" strokeWidth={0.22} />
+        <line key={`r${i}`} x1={x} y1={100} x2={50} y2={0} stroke={color} strokeWidth={0.22} />
       ))}
       {depths.map((y, i) => (
-        <line key={`d${i}`} x1={0} y1={y} x2={100} y2={y} stroke="rgba(255,165,85,0.09)" strokeWidth={0.3} />
+        <line key={`d${i}`} x1={0} y1={y} x2={100} y2={y} stroke={color} strokeWidth={0.3} />
       ))}
     </svg>
   );
 }
 
-function SunsetWindow() {
+function EnvWindow({ w }: { w: ResolvedEnv['window'] }) {
   return (
     <div style={{ position: 'absolute', top: '4.5%', right: '6%', width: '22%' }}>
       <div style={{
         position: 'relative', width: '100%', paddingBottom: '116%',
         border: '3px solid #2c2118', borderRadius: '8px 8px 4px 4px',
-        boxShadow: '0 0 55px rgba(255,150,60,0.3), inset 0 0 28px rgba(255,140,50,0.15)',
+        boxShadow: `0 0 50px ${w.sun.glow}55, inset 0 0 26px rgba(0,0,0,0.3)`,
       }}>
-        <div style={{
-          position: 'absolute', inset: '3px', borderRadius: '5px 5px 2px 2px', overflow: 'hidden',
-          background: 'linear-gradient(180deg,#1f2150 0%,#5b3568 25%,#a8455f 45%,#dd6a37 63%,#f59b3e 79%,#ffc862 91%,#ffe39c 100%)',
-        }}>
-          {[[16, 16, 32], [58, 11, 26], [34, 27, 22]].map(([x, y, w], i) => (
-            <div key={i} style={{ position: 'absolute', left: `${x}%`, top: `${y}%`, width: `${w}%`, height: '3.5%', background: 'rgba(80,36,54,0.5)', borderRadius: '10px' }} />
+        <div style={{ position: 'absolute', inset: '3px', borderRadius: '5px 5px 2px 2px', overflow: 'hidden', background: w.sky }}>
+          {w.clouds && [[16, 16, 32], [58, 11, 26], [34, 27, 22]].map(([x, y, cw], i) => (
+            <div key={i} style={{ position: 'absolute', left: `${x}%`, top: `${y}%`, width: `${cw}%`, height: '3.5%', background: 'rgba(255,255,255,0.22)', borderRadius: '10px' }} />
           ))}
-          <div className="animate-sun-glow" style={{
-            position: 'absolute', bottom: '21%', left: '50%', transform: 'translateX(-50%)',
-            width: '38%', height: 0, paddingBottom: '38%',
-            background: 'radial-gradient(circle,#fff4d2 0%,#ffd26c 54%,#ff9d3c 100%)',
-            borderRadius: '50%', boxShadow: '0 0 38px 13px rgba(255,180,80,0.6)',
-          }} />
-          <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '21%', background: 'linear-gradient(180deg,#bb5c3a 0%,#6e3550 100%)' }}>
-            <div style={{ position: 'absolute', inset: '0 46%', background: 'linear-gradient(180deg,rgba(255,212,124,0.85),transparent)' }} />
+          {w.stars && [[12, 10], [26, 18], [40, 8], [55, 22], [68, 12], [82, 24], [90, 9], [20, 30], [48, 32], [74, 36], [34, 44], [62, 6]].map(([x, y], i) => (
+            <div key={i} style={{ position: 'absolute', left: `${x}%`, top: `${y}%`, width: 2, height: 2, background: 'rgba(255,255,255,0.85)', borderRadius: '50%' }} />
+          ))}
+          {w.moon && (
+            <div style={{ position: 'absolute', top: '14%', left: '24%', width: '20%', height: 0, paddingBottom: '20%', background: 'radial-gradient(circle,#fdf6e0,#cfc6a8)', borderRadius: '50%', boxShadow: '0 0 22px 6px rgba(240,235,210,0.4)' }} />
+          )}
+          {w.sun.show && (
+            <div className="animate-sun-glow" style={{
+              position: 'absolute', bottom: w.sun.bottom, left: '50%', transform: 'translateX(-50%)',
+              width: '38%', height: 0, paddingBottom: '38%',
+              background: `radial-gradient(circle,${w.sun.fill} 0%,#ffd26c 54%,#ff9d3c 100%)`,
+              borderRadius: '50%', boxShadow: `0 0 38px 13px ${w.sun.glow}99`,
+            }} />
+          )}
+          <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '21%', background: `linear-gradient(180deg,${w.sea[0]} 0%,${w.sea[1]} 100%)` }}>
+            <div style={{ position: 'absolute', inset: '0 46%', background: `linear-gradient(180deg,${w.sun.glow}cc,transparent)` }} />
           </div>
           <div style={{
             position: 'absolute', bottom: '16%', left: '-6%', width: '46%', height: '40%',
