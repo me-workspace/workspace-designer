@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import type { DeskItem, SeatingItem, DeviceItem, DeviceGroup, Station } from '@/model/types';
 import { DESKS, SEATING, DEVICES } from '@/data/catalog';
 import { deviceCount } from '@/model/design';
@@ -25,12 +26,31 @@ const SHAPE_ICON: Record<DeskItem['spec']['shape'], string> = {
 };
 
 export default function SelectorPanel({ station, onDeskChange, onSeatingChange, onDeviceChange }: Props) {
-  const groups = GROUP_ORDER
-    .map(g => ({ group: g, items: DEVICES.filter(d => d.spec.group === g) }))
+  const [query, setQuery] = useState('');
+  const [collapsed, setCollapsed] = useState<Set<DeviceGroup>>(
+    () => new Set(GROUP_ORDER.filter(g => g !== 'display')),
+  );
+
+  const q = query.trim().toLowerCase();
+  const searching = q.length > 0;
+  const matches = (item: { name: string; tags: string[] }) =>
+    !q || item.name.toLowerCase().includes(q) || item.tags.some(t => t.includes(q));
+
+  const desks = DESKS.filter(matches);
+  const seats = SEATING.filter(matches);
+  const deviceGroups = GROUP_ORDER
+    .map(g => ({ group: g, items: DEVICES.filter(d => d.spec.group === g && matches(d)) }))
     .filter(g => g.items.length > 0);
 
+  const nothing = searching && !desks.length && !seats.length && !deviceGroups.length;
   const step1Done = !!station.deskId;
   const step2Done = !!station.seatingId;
+
+  const toggle = (g: DeviceGroup) => setCollapsed(prev => {
+    const next = new Set(prev);
+    if (next.has(g)) next.delete(g); else next.add(g);
+    return next;
+  });
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflowY: 'auto' }}>
@@ -41,70 +61,139 @@ export default function SelectorPanel({ station, onDeskChange, onSeatingChange, 
           Configure
         </p>
         <h2 style={{ fontSize: 14, fontWeight: 700, color: '#f2f2f7' }}>Build your workspace</h2>
-        <div style={{ display: 'flex', gap: 5, marginTop: 10 }}>
-          {['Desk', 'Chair', 'Devices'].map((label, i) => {
-            const done = i === 0 ? step1Done : i === 1 ? step2Done : false;
-            const active = i === 0 ? true : i === 1 ? step1Done : step1Done && step2Done;
-            return (
-              <div key={label} style={{ flex: 1 }}>
-                <div style={{ height: 2, borderRadius: 2, background: done ? '#4ade80' : active ? '#2c2c2f' : '#1c1c1f', transition: 'background 0.3s' }} />
-                <p style={{
-                  fontSize: 9, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase',
-                  color: done ? '#4ade80' : active ? '#52525b' : '#3f3f46', marginTop: 3,
-                }}>
-                  {done ? '✓ ' : ''}{label}
-                </p>
-              </div>
-            );
-          })}
+
+        {/* Search */}
+        <div style={{ position: 'relative', marginTop: 10 }}>
+          <span style={{ position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', fontSize: 11, color: '#52525b' }}>⌕</span>
+          <input
+            value={query}
+            onChange={e => setQuery(e.target.value)}
+            placeholder="Search desks, devices…"
+            style={{
+              width: '100%', height: 30, padding: '0 26px 0 24px', borderRadius: 8,
+              background: '#111113', border: '1px solid #2c2c2f',
+              color: '#f2f2f7', fontSize: 11, outline: 'none',
+            }}
+          />
+          {searching && (
+            <button
+              onClick={() => setQuery('')}
+              style={{
+                position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)',
+                width: 18, height: 18, borderRadius: '50%', border: 'none',
+                background: '#2c2c2f', color: '#71717a', cursor: 'pointer', fontSize: 10,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}
+            >✕</button>
+          )}
         </div>
+
+        {!searching && (
+          <div style={{ display: 'flex', gap: 5, marginTop: 10 }}>
+            {['Desk', 'Chair', 'Devices'].map((label, i) => {
+              const done = i === 0 ? step1Done : i === 1 ? step2Done : false;
+              const active = i === 0 ? true : i === 1 ? step1Done : step1Done && step2Done;
+              return (
+                <div key={label} style={{ flex: 1 }}>
+                  <div style={{ height: 2, borderRadius: 2, background: done ? '#4ade80' : active ? '#2c2c2f' : '#1c1c1f', transition: 'background 0.3s' }} />
+                  <p style={{
+                    fontSize: 9, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase',
+                    color: done ? '#4ade80' : active ? '#52525b' : '#3f3f46', marginTop: 3,
+                  }}>
+                    {done ? '✓ ' : ''}{label}
+                  </p>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
-      {/* Step 1 — Desk */}
-      <StepSection step={1} label="Desk" hint="Pick your surface" complete={step1Done}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-          {DESKS.map(desk => (
-            <DeskCard key={desk.id} desk={desk} selected={station.deskId === desk.id} onClick={() => onDeskChange(desk.id)} />
-          ))}
-        </div>
-      </StepSection>
+      {nothing && (
+        <p style={{ padding: '24px 16px', fontSize: 11, color: '#52525b', textAlign: 'center', fontStyle: 'italic' }}>
+          No matches for &ldquo;{query}&rdquo;.
+        </p>
+      )}
 
-      <Divider />
-
-      {/* Step 2 — Chair */}
-      <StepSection step={2} label="Chair" hint="Find your seat" complete={step2Done}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-          {SEATING.map(chair => (
-            <SeatingCard key={chair.id} chair={chair} selected={station.seatingId === chair.id} onClick={() => onSeatingChange(chair.id)} />
-          ))}
-        </div>
-      </StepSection>
-
-      <Divider />
-
-      {/* Step 3 — Devices */}
-      <StepSection step={3} label="Devices" hint="Add the extras">
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          {groups.map(({ group, items }) => (
-            <div key={group}>
-              <p style={{ fontSize: 9, fontWeight: 700, color: '#52525b', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 5 }}>
-                {GROUP_LABEL[group]}
-              </p>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                {items.map(dev => (
-                  <DeviceCard
-                    key={dev.id}
-                    device={dev}
-                    count={deviceCount(station, dev.id)}
-                    onAdd={() => onDeviceChange(dev.id, 1)}
-                    onRemove={() => onDeviceChange(dev.id, -1)}
-                  />
-                ))}
-              </div>
+      {/* Desk */}
+      {desks.length > 0 && (
+        <>
+          <StepSection step={1} label="Desk" hint={searching ? `${desks.length} match` : 'Pick your surface'} complete={step1Done}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+              {desks.map(desk => (
+                <DeskCard key={desk.id} desk={desk} selected={station.deskId === desk.id} onClick={() => onDeskChange(desk.id)} />
+              ))}
             </div>
-          ))}
-        </div>
-      </StepSection>
+          </StepSection>
+          <Divider />
+        </>
+      )}
+
+      {/* Chair */}
+      {seats.length > 0 && (
+        <>
+          <StepSection step={2} label="Chair" hint={searching ? `${seats.length} match` : 'Find your seat'} complete={step2Done}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+              {seats.map(chair => (
+                <SeatingCard key={chair.id} chair={chair} selected={station.seatingId === chair.id} onClick={() => onSeatingChange(chair.id)} />
+              ))}
+            </div>
+          </StepSection>
+          <Divider />
+        </>
+      )}
+
+      {/* Devices */}
+      {deviceGroups.length > 0 && (
+        <StepSection step={3} label="Devices" hint="Add the extras">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {deviceGroups.map(({ group, items }) => {
+              const open = searching || !collapsed.has(group);
+              const selected = items.reduce((n, d) => n + deviceCount(station, d.id), 0);
+              return (
+                <div key={group}>
+                  <button
+                    onClick={() => toggle(group)}
+                    disabled={searching}
+                    style={{
+                      width: '100%', display: 'flex', alignItems: 'center', gap: 6,
+                      background: 'transparent', border: 'none', padding: '3px 0',
+                      cursor: searching ? 'default' : 'pointer',
+                    }}
+                  >
+                    <span style={{ fontSize: 9, color: '#52525b', width: 8 }}>{open ? '▾' : '▸'}</span>
+                    <span style={{ fontSize: 9, fontWeight: 700, color: '#71717a', letterSpacing: '0.1em', textTransform: 'uppercase' }}>
+                      {GROUP_LABEL[group]}
+                    </span>
+                    <span style={{ fontSize: 9, color: '#3f3f46' }}>{items.length}</span>
+                    {selected > 0 && (
+                      <span style={{
+                        marginLeft: 'auto', fontSize: 9, fontWeight: 800,
+                        minWidth: 16, height: 16, padding: '0 4px', borderRadius: 8,
+                        background: 'rgba(74,222,128,0.14)', color: '#4ade80',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      }}>{selected}</span>
+                    )}
+                  </button>
+                  {open && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 4 }}>
+                      {items.map(dev => (
+                        <DeviceCard
+                          key={dev.id}
+                          device={dev}
+                          count={deviceCount(station, dev.id)}
+                          onAdd={() => onDeviceChange(dev.id, 1)}
+                          onRemove={() => onDeviceChange(dev.id, -1)}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </StepSection>
+      )}
 
       <div style={{ height: 16 }} />
     </div>
