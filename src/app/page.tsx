@@ -182,38 +182,39 @@ export default function Page() {
 
           {/* Top bar */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div>
               <span style={{ fontSize: 10, fontWeight: 700, color: '#52525b', letterSpacing: '0.12em', textTransform: 'uppercase' }}>
-                Live Preview
+                Your Studio
               </span>
-              {qty > 1 && (
-                <span style={{
-                  fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 20,
-                  background: 'rgba(74,222,128,0.08)', color: '#4ade80',
-                  border: '1px solid rgba(74,222,128,0.2)', letterSpacing: '0.06em',
-                }}>
-                  ×{qty} WORKSPACES
-                </span>
-              )}
+              <p style={{ fontSize: 11, color: '#71717a', marginTop: 2 }}>
+                {qty === 1 ? 'Solo workspace' : `Office for ${qty} — ${qty} identical setups`}
+              </p>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-              <span style={{ fontSize: 10, color: '#52525b', marginRight: 2 }}>Desks:</span>
-              {QTY_OPTIONS.map(q => (
-                <button
-                  key={q}
-                  onClick={() => setQty(q)}
-                  style={{
-                    width: 32, height: 24, borderRadius: 6,
-                    background: qty === q ? '#4ade80' : '#1c1c1f',
-                    color: qty === q ? '#09090b' : '#71717a',
-                    border: `1px solid ${qty === q ? '#4ade80' : '#2c2c2f'}`,
-                    fontSize: 11, fontWeight: qty === q ? 800 : 500,
-                    cursor: 'pointer', transition: 'all 0.12s',
-                  }}
-                >
-                  {q === 10 ? '10+' : q}
-                </button>
-              ))}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: 10, fontWeight: 700, color: '#52525b', letterSpacing: '0.1em', textTransform: 'uppercase' }}>
+                Team size
+              </span>
+              <div style={{
+                display: 'flex', gap: 3, padding: 3, borderRadius: 9,
+                background: '#1c1c1f', border: '1px solid #2c2c2f',
+              }}>
+                {QTY_OPTIONS.map(q => (
+                  <button
+                    key={q}
+                    onClick={() => setQty(q)}
+                    style={{
+                      minWidth: 38, height: 24, padding: '0 9px', borderRadius: 6,
+                      background: qty === q ? '#4ade80' : 'transparent',
+                      color: qty === q ? '#09090b' : '#71717a',
+                      border: 'none',
+                      fontSize: 11, fontWeight: qty === q ? 800 : 600,
+                      cursor: 'pointer', transition: 'all 0.12s',
+                    }}
+                  >
+                    {q === 1 ? 'Solo' : q === 10 ? '10+' : q}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
 
