@@ -142,6 +142,40 @@ export function removeZone(design: WorkspaceDesign, zoneId: string): WorkspaceDe
   return { ...design, zones: design.zones.filter((_, i) => i !== idx) };
 }
 
+/* ════════ Hybrid placement — drag to fine-tune ════════ */
+
+/** Pin a device to a dragged position on the desk surface (0..1 coords). */
+export function moveDevice(design: WorkspaceDesign, deviceUid: string, offset: { x: number; y: number }): WorkspaceDesign {
+  return editStation(design, s => ({
+    ...s,
+    devices: s.devices.map(d => (d.uid === deviceUid ? { ...d, offset, pinned: true } : d)),
+  }));
+}
+
+/** Pin a zone to a dragged spot on the floor (0..1 coords). */
+export function moveZone(design: WorkspaceDesign, zoneUid: string, spot: { x: number; y: number }): WorkspaceDesign {
+  return {
+    ...design,
+    zones: design.zones.map(z => (z.uid === zoneUid ? { ...z, spot, pinned: true } : z)),
+  };
+}
+
+export function hasPins(design: WorkspaceDesign): boolean {
+  return design.stations.some(s => s.devices.some(d => d.pinned)) || design.zones.some(z => z.pinned);
+}
+
+/** Drop every manual pin so the auto-layout takes over again. */
+export function resetArrangement(design: WorkspaceDesign): WorkspaceDesign {
+  return {
+    ...design,
+    stations: design.stations.map(s => ({
+      ...s,
+      devices: s.devices.map(d => ({ ...d, pinned: false, offset: { x: 0, y: 0 } })),
+    })),
+    zones: design.zones.map((z, i) => ({ ...z, pinned: false, spot: { ...ZONE_SPOTS[i % ZONE_SPOTS.length] } })),
+  };
+}
+
 /* ════════ Pricing ════════ */
 
 export function stationTotal(station: Station): Price {

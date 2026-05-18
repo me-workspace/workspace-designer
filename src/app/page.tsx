@@ -5,6 +5,7 @@ import type { WorkspaceDesign, SavedDesign, EnvironmentConfig } from '@/model/ty
 import {
   emptyDesign, editStation, setStationCount, presetToDesign,
   designTotal, addDevice, removeDevice, addZone, removeZone,
+  moveDevice, moveZone, resetArrangement,
   getDesk, getSeating, getDevice, getZone,
 } from '@/model/design';
 import WorkspaceCanvas from '@/components/WorkspaceCanvas';
@@ -60,6 +61,11 @@ export default function Page() {
     setDesign(d => ({ ...d, environment: { ...d.environment, ...patch } }));
   const handleZone = (zoneId: string, delta: number) =>
     setDesign(d => (delta > 0 ? addZone(d, zoneId) : removeZone(d, zoneId)));
+  const handleMoveDevice = (uid: string, offset: { x: number; y: number }) =>
+    setDesign(d => moveDevice(d, uid, offset));
+  const handleMoveZone = (uid: string, spot: { x: number; y: number }) =>
+    setDesign(d => moveZone(d, uid, spot));
+  const handleResetLayout = () => setDesign(resetArrangement);
 
   const handleSave = () => {
     const name = saveName.trim() ||
@@ -216,7 +222,12 @@ export default function Page() {
 
           {/* Canvas */}
           <div style={{ flex: 1, minHeight: 0, borderRadius: 14, overflow: 'hidden', border: '1px solid #1f1f22' }}>
-            <WorkspaceCanvas design={design} />
+            <WorkspaceCanvas
+              design={design}
+              onMoveDevice={handleMoveDevice}
+              onMoveZone={handleMoveZone}
+              onResetLayout={handleResetLayout}
+            />
           </div>
 
           {/* Bottom bar */}

@@ -1,7 +1,8 @@
 'use client';
 
-import type { WorkspaceDesign, Station } from '@/model/types';
-import { getDesk, getSeating, getDevice, getZone, layoutStation } from '@/model/design';
+import { useRef, useState } from 'react';
+import type { WorkspaceDesign, Station, ZoneItem, PlacedZone } from '@/model/types';
+import { getDesk, getSeating, getDevice, getZone, layoutStation, hasPins, type LaidDevice } from '@/model/design';
 import { resolveEnvironment, type ResolvedEnv } from '@/model/environment';
 import DeskGlyph from './glyphs/DeskGlyph';
 import SeatingGlyph from './glyphs/SeatingGlyph';
@@ -10,9 +11,13 @@ import ZoneGlyph from './glyphs/ZoneGlyph';
 
 interface Props {
   design: WorkspaceDesign;
+  onMoveDevice: (deviceUid: string, offset: { x: number; y: number }) => void;
+  onMoveZone: (zoneUid: string, spot: { x: number; y: number }) => void;
+  onResetLayout: () => void;
 }
 
-const G = '#4ade80'; // brand green
+const G = '#4ade80';
+const clamp = (n: number, a: number, b: number) => Math.min(b, Math.max(a, n));
 
 /* ── Office floor: desks fan into the room as a widening pyramid ── */
 function deskRows(qty: number): number[] {
@@ -42,7 +47,7 @@ function buildSlots(qty: number): Slot[] {
   return slots;
 }
 
-export default function WorkspaceCanvas({ design }: Props) {
+export default function WorkspaceCanvas({ design, onMoveDevice, onMoveZone, onResetLayout }: Props) {
   const re = resolveEnvironment(design.environment);
   const template = design.stations[0];
   const teamSize = design.stations.length;
@@ -50,6 +55,7 @@ export default function WorkspaceCanvas({ design }: Props) {
   const isEmpty = !hasStations && design.zones.length === 0;
   const slots = buildSlots(teamSize).sort((a, b) => b.d - a.d);
   const baseH = teamSize === 1 ? 74 : 60;
+  const pinned = hasPins(design);
 
   const desk = getDesk(template.deskId);
   const seating = getSeating(template.seatingId);
@@ -119,6 +125,7 @@ export default function WorkspaceCanvas({ design }: Props) {
         const bottom = 2.5 + (1 - Math.pow(1 - s.d, 1.85)) * 36;
         const blur = s.d > 0.62 ? (s.d - 0.62) * 4 : 0;
         const station = design.stations[s.idx] ?? template;
+        const hero = s.d === 0;
         return (
           <div key={s.idx} style={{
             position: 'absolute', left: `${s.x}%`, bottom: `${bottom}%`,
@@ -128,7 +135,7 @@ export default function WorkspaceCanvas({ design }: Props) {
             filter: `brightness(${1 - s.d * 0.3}) saturate(${1 - s.d * 0.22})${blur ? ` blur(${blur}px)` : ''}`,
           }}>
             <div className="animate-rise-in" style={{ position: 'relative', width: '100%', height: '100%', animationDelay: `${s.idx * 0.06}s` }}>
-              <Workstation station={station} />
+              <Workstation station={station} interactive={hero} onDeviceMove={onMoveDevice} />
             </div>
           </div>
         );
@@ -138,23 +145,7 @@ export default function WorkspaceCanvas({ design }: Props) {
       {design.zones.map(pz => {
         const zone = getZone(pz.zoneId);
         if (!zone) return null;
-        const depth = pz.spot.y;
-        const scale = (0.5 + (1 - depth) * 0.5) * (0.7 + zone.spec.footprint.w);
-        const bottom = 3 + (1 - Math.pow(1 - depth, 1.85)) * 40;
-        const blur = depth > 0.66 ? (depth - 0.66) * 5 : 0;
-        return (
-          <div key={pz.uid} style={{
-            position: 'absolute', left: `${pz.spot.x * 100}%`, bottom: `${bottom}%`,
-            height: '40%', aspectRatio: '1.1',
-            transform: `translateX(-50%) scale(${scale})`, transformOrigin: 'bottom center',
-            zIndex: Math.round((1 - depth) * 100) + 10,
-            filter: `brightness(${1 - depth * 0.34}) saturate(${1 - depth * 0.24})${blur ? ` blur(${blur}px)` : ''}`,
-          }}>
-            <div className="animate-rise-in" style={{ position: 'relative', width: '100%', height: '100%' }}>
-              <ZoneGlyph spec={zone.spec} />
-            </div>
-          </div>
-        );
+        return <PlacedZoneView key={pz.uid} pz={pz} zone={zone} onMove={onMoveZone} />;
       })}
 
       {/* Office badge */}
@@ -172,6 +163,33 @@ export default function WorkspaceCanvas({ design }: Props) {
         </div>
       )}
 
+      {/* Arrange hint / reset */}
+      {!isEmpty && (
+        pinned ? (
+          <button
+            onClick={onResetLayout}
+            style={{
+              position: 'absolute', top: 12, right: 12, zIndex: 210,
+              background: 'rgba(20,14,9,0.82)', backdropFilter: 'blur(6px)',
+              border: '1px solid rgba(255,170,90,0.3)', borderRadius: 8,
+              padding: '5px 11px', cursor: 'pointer',
+              fontSize: 11, fontWeight: 700, color: '#ffce8a',
+            }}
+          >
+            ↺ Auto-arrange
+          </button>
+        ) : (
+          <div style={{
+            position: 'absolute', top: 12, right: 12, zIndex: 210,
+            background: 'rgba(20,14,9,0.7)', backdropFilter: 'blur(6px)',
+            border: '1px solid rgba(255,255,255,0.06)', borderRadius: 8,
+            padding: '5px 11px', fontSize: 10, color: '#9a8268', letterSpacing: '0.03em',
+          }}>
+            ✋ Drag items to rearrange
+          </div>
+        )
+      )}
+
       {/* Caption */}
       {!isEmpty && caption && (
         <div style={{ position: 'absolute', bottom: 8, left: 0, right: 0, textAlign: 'center', zIndex: 200, pointerEvents: 'none' }}>
@@ -186,7 +204,11 @@ export default function WorkspaceCanvas({ design }: Props) {
 
 /* ════════ One workstation ════════ */
 
-function Workstation({ station }: { station: Station }) {
+function Workstation({ station, interactive, onDeviceMove }: {
+  station: Station;
+  interactive: boolean;
+  onDeviceMove: (uid: string, offset: { x: number; y: number }) => void;
+}) {
   const desk = getDesk(station.deskId);
   const seating = getSeating(station.seatingId);
   const laid = layoutStation(station);
@@ -204,13 +226,7 @@ function Workstation({ station }: { station: Station }) {
       {desk && (
         <div style={{ position: 'absolute', left: '5%', right: '5%', top: '2%', height: '42%' }}>
           {laid.map(ld => (
-            <div key={ld.placed.uid} className="animate-scale-in" style={{
-              position: 'absolute',
-              left: `${ld.rect.x * 100}%`, top: `${ld.rect.y * 100}%`,
-              width: `${ld.rect.w * 100}%`, height: `${ld.rect.h * 100}%`,
-            }}>
-              <DeviceGlyph spec={ld.device.spec} />
-            </div>
+            <PlacedDeviceView key={ld.placed.uid} ld={ld} draggable={interactive} onMove={onDeviceMove} />
           ))}
         </div>
       )}
@@ -220,6 +236,112 @@ function Workstation({ station }: { station: Station }) {
           <SeatingGlyph spec={seating.spec} />
         </div>
       )}
+    </div>
+  );
+}
+
+function PlacedDeviceView({ ld, draggable, onMove }: {
+  ld: LaidDevice;
+  draggable: boolean;
+  onMove: (uid: string, offset: { x: number; y: number }) => void;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [dragging, setDragging] = useState(false);
+  const fp = ld.device.spec.footprint;
+
+  const onDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!draggable) return;
+    e.stopPropagation();
+    e.currentTarget.setPointerCapture(e.pointerId);
+    setDragging(true);
+  };
+  const onMv = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!dragging) return;
+    const layer = ref.current?.parentElement;
+    if (!layer) return;
+    const r = layer.getBoundingClientRect();
+    const x = clamp((e.clientX - r.left) / r.width - fp.w / 2, 0, 1 - fp.w);
+    const y = clamp((e.clientY - r.top) / r.height - fp.h / 2, 0, 1 - fp.h);
+    onMove(ld.placed.uid, { x, y });
+  };
+  const onUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!dragging) return;
+    e.currentTarget.releasePointerCapture(e.pointerId);
+    setDragging(false);
+  };
+
+  return (
+    <div
+      ref={ref}
+      onPointerDown={onDown}
+      onPointerMove={onMv}
+      onPointerUp={onUp}
+      style={{
+        position: 'absolute',
+        left: `${ld.rect.x * 100}%`, top: `${ld.rect.y * 100}%`,
+        width: `${ld.rect.w * 100}%`, height: `${ld.rect.h * 100}%`,
+        cursor: draggable ? (dragging ? 'grabbing' : 'grab') : 'default',
+        touchAction: draggable ? 'none' : undefined,
+        zIndex: dragging ? 60 : undefined,
+        filter: dragging ? 'drop-shadow(0 6px 10px rgba(0,0,0,0.6))' : undefined,
+      }}
+    >
+      <DeviceGlyph spec={ld.device.spec} />
+    </div>
+  );
+}
+
+function PlacedZoneView({ pz, zone, onMove }: {
+  pz: PlacedZone;
+  zone: ZoneItem;
+  onMove: (uid: string, spot: { x: number; y: number }) => void;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [dragging, setDragging] = useState(false);
+  const depth = pz.spot.y;
+  const scale = (0.5 + (1 - depth) * 0.5) * (0.7 + zone.spec.footprint.w);
+  const bottom = 3 + (1 - Math.pow(1 - depth, 1.85)) * 40;
+  const blur = depth > 0.66 ? (depth - 0.66) * 5 : 0;
+
+  const onDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    e.stopPropagation();
+    e.currentTarget.setPointerCapture(e.pointerId);
+    setDragging(true);
+  };
+  const onMv = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!dragging) return;
+    const root = ref.current?.parentElement;
+    if (!root) return;
+    const r = root.getBoundingClientRect();
+    const x = clamp((e.clientX - r.left) / r.width, 0.05, 0.95);
+    const y = clamp((0.99 - (e.clientY - r.top) / r.height) / 0.6, 0, 1);
+    onMove(pz.uid, { x, y });
+  };
+  const onUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!dragging) return;
+    e.currentTarget.releasePointerCapture(e.pointerId);
+    setDragging(false);
+  };
+
+  return (
+    <div
+      ref={ref}
+      onPointerDown={onDown}
+      onPointerMove={onMv}
+      onPointerUp={onUp}
+      style={{
+        position: 'absolute', left: `${pz.spot.x * 100}%`, bottom: `${bottom}%`,
+        height: '40%', aspectRatio: '1.1',
+        transform: `translateX(-50%) scale(${scale})`, transformOrigin: 'bottom center',
+        zIndex: dragging ? 240 : Math.round((1 - depth) * 100) + 10,
+        filter: `brightness(${1 - depth * 0.34}) saturate(${1 - depth * 0.24})${blur ? ` blur(${blur}px)` : ''}`,
+        cursor: dragging ? 'grabbing' : 'grab',
+        touchAction: 'none',
+      }}
+    >
+      <div className="animate-rise-in" style={{ position: 'relative', width: '100%', height: '100%' }}>
+        <ZoneGlyph spec={zone.spec} />
+      </div>
     </div>
   );
 }
