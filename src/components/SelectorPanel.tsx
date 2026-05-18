@@ -1,7 +1,7 @@
 'use client';
 
-import { Desk, Chair, Accessory, WorkspaceSelection } from '@/types';
-import { DESKS, CHAIRS, ACCESSORIES, CATEGORY_LABELS } from '@/data/products';
+import type { Desk, Chair, Accessory, WorkspaceSelection } from '@/types';
+import { DESKS, CHAIRS, ACCESSORIES } from '@/data/products';
 
 interface Props {
   selection: WorkspaceSelection;
@@ -10,102 +10,167 @@ interface Props {
   onAccessoryChange: (accessory: Accessory, delta: number) => void;
 }
 
-function formatIDR(amount: number) {
-  return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(amount);
-}
+const idr = (n: number) =>
+  new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(n);
 
-const CATEGORY_ICONS: Record<string, string> = {
-  display: '🖥',
-  lighting: '💡',
-  nature: '🌿',
-  tech: '⚡',
+const CATEGORY_META: Record<string, { label: string; icon: string }> = {
+  display:  { label: 'Displays',  icon: '🖥' },
+  lighting: { label: 'Lighting',  icon: '💡' },
+  nature:   { label: 'Nature',    icon: '🌿' },
+  tech:     { label: 'Tech',      icon: '⚡' },
+};
+
+const DESK_ICONS: Record<string, string> = {
+  minimal:  '▭',
+  lshaped:  '⌐',
+  standing: '↕',
+};
+
+const CHAIR_ICONS: Record<string, string> = {
+  mesh:     '⠿',
+  leather:  '◼',
+  ergonomic:'◕',
 };
 
 export default function SelectorPanel({ selection, onDeskChange, onChairChange, onAccessoryChange }: Props) {
-  const accessoriesByCategory = ACCESSORIES.reduce<Record<string, Accessory[]>>((acc, item) => {
-    if (!acc[item.category]) acc[item.category] = [];
-    acc[item.category].push(item);
+  const byCategory = ACCESSORIES.reduce<Record<string, Accessory[]>>((acc, a) => {
+    (acc[a.category] ??= []).push(a);
     return acc;
   }, {});
 
+  const step1Done = !!selection.desk;
+  const step2Done = !!selection.chair;
+
   return (
-    <div className="flex flex-col h-full overflow-y-auto">
-      {/* Desk */}
-      <Section title="Desk" subtitle="Choose your surface">
-        <div className="space-y-2">
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflowY: 'auto' }}>
+
+      {/* Header */}
+      <div style={{
+        padding: '16px 20px 12px',
+        borderBottom: '1px solid #EAE4DA',
+        background: '#FAF7F2',
+      }}>
+        <p style={{ fontSize: 11, fontWeight: 700, color: '#B0A494', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 2 }}>
+          Configure
+        </p>
+        <h2 style={{ fontSize: 15, fontWeight: 700, color: '#1A1510' }}>Build your workspace</h2>
+        {/* Progress bar */}
+        <div style={{ display: 'flex', gap: 5, marginTop: 10 }}>
+          {['Desk', 'Chair', 'Extras'].map((label, i) => {
+            const done = i === 0 ? step1Done : i === 1 ? step2Done : false;
+            const active = i === 0 ? true : i === 1 ? step1Done : step1Done && step2Done;
+            return (
+              <div key={label} style={{ flex: 1 }}>
+                <div style={{
+                  height: 3, borderRadius: 2,
+                  background: done ? '#0E8C7E' : active ? '#D4C8B8' : '#E8E4DC',
+                  transition: 'background 0.3s',
+                }} />
+                <p style={{
+                  fontSize: 9, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase',
+                  color: done ? '#0E8C7E' : active ? '#9A8E80' : '#C4B8A8',
+                  marginTop: 3,
+                }}>
+                  {done ? '✓ ' : ''}{label}
+                </p>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Step 1 — Desk */}
+      <StepSection step={1} label="Desk" hint="Pick your surface" complete={step1Done}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           {DESKS.map(desk => (
-            <ProductCard
+            <DeskCard
               key={desk.id}
-              name={desk.name}
-              tagline={desk.tagline}
-              price={desk.price}
+              desk={desk}
               selected={selection.desk?.id === desk.id}
               onClick={() => onDeskChange(desk)}
-              accent={desk.surfaceColor}
             />
           ))}
         </div>
-      </Section>
+      </StepSection>
 
       <Divider />
 
-      {/* Chair */}
-      <Section title="Chair" subtitle="Find your seat">
-        <div className="space-y-2">
+      {/* Step 2 — Chair */}
+      <StepSection step={2} label="Chair" hint="Find your seat" complete={step2Done}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           {CHAIRS.map(chair => (
-            <ProductCard
+            <ChairCard
               key={chair.id}
-              name={chair.name}
-              tagline={chair.tagline}
-              price={chair.price}
+              chair={chair}
               selected={selection.chair?.id === chair.id}
               onClick={() => onChairChange(chair)}
-              accent={chair.seatColor}
             />
           ))}
         </div>
-      </Section>
+      </StepSection>
 
       <Divider />
 
-      {/* Accessories */}
-      <Section title="Accessories" subtitle="Build it out">
-        <div className="space-y-4">
-          {Object.entries(accessoriesByCategory).map(([category, items]) => (
-            <div key={category}>
-              <p className="text-xs font-semibold uppercase tracking-widest text-[#9A8E80] mb-2">
-                {CATEGORY_ICONS[category]} {CATEGORY_LABELS[category]}
-              </p>
-              <div className="space-y-2">
-                {items.map(accessory => {
-                  const qty = selection.accessories[accessory.id]?.quantity ?? 0;
-                  return (
-                    <AccessoryCard
-                      key={accessory.id}
-                      accessory={accessory}
-                      quantity={qty}
-                      onAdd={() => onAccessoryChange(accessory, 1)}
-                      onRemove={() => onAccessoryChange(accessory, -1)}
-                    />
-                  );
-                })}
+      {/* Step 3 — Accessories */}
+      <StepSection step={3} label="Accessories" hint="Add the extras">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {Object.entries(byCategory).map(([cat, items]) => {
+            const meta = CATEGORY_META[cat];
+            return (
+              <div key={cat}>
+                <p style={{
+                  fontSize: 10, fontWeight: 700, color: '#9A8E80',
+                  letterSpacing: '0.1em', textTransform: 'uppercase',
+                  marginBottom: 6,
+                }}>
+                  {meta.icon} {meta.label}
+                </p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                  {items.map(acc => {
+                    const qty = selection.accessories[acc.id]?.quantity ?? 0;
+                    return (
+                      <AccessoryCard
+                        key={acc.id}
+                        acc={acc}
+                        qty={qty}
+                        onAdd={() => onAccessoryChange(acc, 1)}
+                        onRemove={() => onAccessoryChange(acc, -1)}
+                      />
+                    );
+                  })}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
-      </Section>
+      </StepSection>
 
-      <div className="h-4" />
+      <div style={{ height: 16 }} />
     </div>
   );
 }
 
-function Section({ title, subtitle, children }: { title: string; subtitle: string; children: React.ReactNode }) {
+function StepSection({ step, label, hint, complete, children }: {
+  step: number; label: string; hint: string; complete?: boolean; children: React.ReactNode;
+}) {
   return (
-    <div className="px-5 py-4">
-      <div className="mb-3">
-        <h2 className="text-sm font-bold text-[#1A1510] tracking-tight">{title}</h2>
-        <p className="text-xs text-[#9A8E80] mt-0.5">{subtitle}</p>
+    <div style={{ padding: '16px 20px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+        <div style={{
+          width: 22, height: 22,
+          borderRadius: '50%',
+          background: complete ? '#0E8C7E' : '#1A1510',
+          color: 'white',
+          fontSize: 10, fontWeight: 800,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          flexShrink: 0,
+        }}>
+          {complete ? '✓' : step}
+        </div>
+        <div>
+          <p style={{ fontSize: 13, fontWeight: 700, color: '#1A1510', lineHeight: 1 }}>{label}</p>
+          <p style={{ fontSize: 11, color: '#9A8E80', marginTop: 2 }}>{hint}</p>
+        </div>
       </div>
       {children}
     </div>
@@ -113,119 +178,183 @@ function Section({ title, subtitle, children }: { title: string; subtitle: strin
 }
 
 function Divider() {
-  return <div className="mx-5 border-t border-[#E8E0D0]" />;
+  return <div style={{ height: 1, margin: '0 20px', background: '#EAE4DA' }} />;
 }
 
-function ProductCard({
-  name,
-  tagline,
-  price,
-  selected,
-  onClick,
-  accent,
-}: {
-  name: string;
-  tagline: string;
-  price: number;
-  selected: boolean;
-  onClick: () => void;
-  accent: string;
-}) {
+function DeskCard({ desk, selected, onClick }: { desk: Desk; selected: boolean; onClick: () => void }) {
   return (
     <button
       onClick={onClick}
-      className={`w-full text-left rounded-xl px-3 py-2.5 transition-all duration-200 cursor-pointer border ${
-        selected
-          ? 'bg-[#1A1510] border-[#1A1510] text-white shadow-md'
-          : 'bg-white border-[#E8E0D0] text-[#1A1510] hover:border-[#C4B8A8] hover:shadow-sm'
-      }`}
+      style={{
+        width: '100%', textAlign: 'left',
+        background: selected ? '#1A1510' : 'white',
+        border: `1.5px solid ${selected ? '#1A1510' : '#EAE4DA'}`,
+        borderRadius: 12,
+        padding: '10px 12px',
+        cursor: 'pointer',
+        transition: 'all 0.18s',
+        position: 'relative',
+        overflow: 'hidden',
+      }}
+      onMouseEnter={e => { if (!selected) (e.currentTarget as HTMLElement).style.borderColor = '#C4B8A8'; }}
+      onMouseLeave={e => { if (!selected) (e.currentTarget as HTMLElement).style.borderColor = '#EAE4DA'; }}
     >
-      <div className="flex items-center gap-2.5">
-        {/* Color swatch */}
-        <span
-          className="w-3 h-3 rounded-full flex-shrink-0 ring-1 ring-black/10"
-          style={{ backgroundColor: accent }}
-        />
-        <div className="flex-1 min-w-0">
-          <div className="flex items-baseline justify-between gap-1">
-            <span className="text-sm font-semibold truncate">{name}</span>
-            <span className={`text-xs font-medium flex-shrink-0 ${selected ? 'text-white/70' : 'text-[#9A8E80]'}`}>
-              {formatIDR(price)}<span className="opacity-60">/mo</span>
+      {/* Desk color strip */}
+      <div style={{
+        position: 'absolute', left: 0, top: 0, bottom: 0, width: 4,
+        background: `linear-gradient(180deg, ${desk.surfaceColor}, ${desk.edgeColor})`,
+        borderRadius: '12px 0 0 12px',
+      }} />
+      <div style={{ paddingLeft: 8 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{
+              fontSize: 10,
+              color: selected ? 'rgba(255,255,255,0.5)' : '#9A8E80',
+              fontFamily: 'monospace',
+            }}>
+              {DESK_ICONS[desk.style]}
+            </span>
+            <span style={{ fontSize: 13, fontWeight: 700, color: selected ? 'white' : '#1A1510' }}>
+              {desk.name}
             </span>
           </div>
-          <p className={`text-xs mt-0.5 truncate ${selected ? 'text-white/70' : 'text-[#9A8E80]'}`}>{tagline}</p>
-        </div>
-        {selected && (
-          <span className="text-white/80 flex-shrink-0">
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-              <circle cx="7" cy="7" r="6.5" stroke="currentColor" />
-              <path d="M4 7l2 2 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
+          <span style={{ fontSize: 11, fontWeight: 600, color: selected ? 'rgba(255,255,255,0.65)' : '#9A8E80', whiteSpace: 'nowrap' }}>
+            {idr(desk.price)}<span style={{ fontSize: 9, opacity: 0.7 }}>/mo</span>
           </span>
-        )}
+        </div>
+        <p style={{ fontSize: 11, color: selected ? 'rgba(255,255,255,0.6)' : '#9A8E80', marginTop: 3 }}>
+          {desk.tagline}
+        </p>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 6 }}>
+          {desk.description.split(',').slice(0, 2).map(f => f.trim().split(' ').slice(0, 3).join(' ')).map((tag, i) => (
+            <span key={i} style={{
+              fontSize: 9, fontWeight: 600, letterSpacing: '0.04em',
+              padding: '2px 6px', borderRadius: 10,
+              background: selected ? 'rgba(255,255,255,0.12)' : '#F4EFE8',
+              color: selected ? 'rgba(255,255,255,0.65)' : '#7A6E60',
+            }}>
+              {tag}
+            </span>
+          ))}
+        </div>
       </div>
     </button>
   );
 }
 
-function AccessoryCard({
-  accessory,
-  quantity,
-  onAdd,
-  onRemove,
-}: {
-  accessory: Accessory;
-  quantity: number;
-  onAdd: () => void;
-  onRemove: () => void;
-}) {
-  const active = quantity > 0;
+function ChairCard({ chair, selected, onClick }: { chair: Chair; selected: boolean; onClick: () => void }) {
   return (
-    <div
-      className={`rounded-xl px-3 py-2.5 border transition-all duration-200 ${
-        active ? 'bg-[#F0F9F7] border-[#0E8C7E]/30' : 'bg-white border-[#E8E0D0]'
-      }`}
+    <button
+      onClick={onClick}
+      style={{
+        width: '100%', textAlign: 'left',
+        background: selected ? '#1A1510' : 'white',
+        border: `1.5px solid ${selected ? '#1A1510' : '#EAE4DA'}`,
+        borderRadius: 12,
+        padding: '10px 12px',
+        cursor: 'pointer',
+        transition: 'all 0.18s',
+        position: 'relative',
+        overflow: 'hidden',
+      }}
+      onMouseEnter={e => { if (!selected) (e.currentTarget as HTMLElement).style.borderColor = '#C4B8A8'; }}
+      onMouseLeave={e => { if (!selected) (e.currentTarget as HTMLElement).style.borderColor = '#EAE4DA'; }}
     >
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex-1 min-w-0">
-          <div className="flex items-baseline gap-1.5">
-            <span className="text-sm font-semibold text-[#1A1510] truncate">{accessory.name}</span>
-            <span className="text-xs text-[#9A8E80]">
-              {new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(accessory.price)}/mo
+      {/* Chair color strip */}
+      <div style={{
+        position: 'absolute', left: 0, top: 0, bottom: 0, width: 4,
+        background: chair.seatColor,
+        borderRadius: '12px 0 0 12px',
+      }} />
+      <div style={{ paddingLeft: 8 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <div style={{
+              width: 10, height: 10, borderRadius: '50%', flexShrink: 0,
+              background: chair.seatColor,
+              border: `1px solid ${selected ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.1)'}`,
+            }} />
+            <span style={{ fontSize: 13, fontWeight: 700, color: selected ? 'white' : '#1A1510' }}>
+              {chair.name}
             </span>
           </div>
-          <p className="text-xs text-[#9A8E80] mt-0.5 truncate">{accessory.tagline}</p>
+          <span style={{ fontSize: 11, fontWeight: 600, color: selected ? 'rgba(255,255,255,0.65)' : '#9A8E80', whiteSpace: 'nowrap' }}>
+            {idr(chair.price)}<span style={{ fontSize: 9, opacity: 0.7 }}>/mo</span>
+          </span>
         </div>
+        <p style={{ fontSize: 11, color: selected ? 'rgba(255,255,255,0.6)' : '#9A8E80', marginTop: 3 }}>
+          {chair.tagline}
+        </p>
+        <div style={{ display: 'flex', gap: 4, marginTop: 6 }}>
+          <span style={{
+            fontSize: 9, fontWeight: 600, letterSpacing: '0.04em',
+            padding: '2px 6px', borderRadius: 10,
+            background: selected ? 'rgba(255,255,255,0.12)' : '#F4EFE8',
+            color: selected ? 'rgba(255,255,255,0.65)' : '#7A6E60',
+            textTransform: 'capitalize',
+          }}>
+            {chair.style}
+          </span>
+        </div>
+      </div>
+    </button>
+  );
+}
 
-        {/* Quantity controls */}
-        <div className="flex items-center gap-1.5 flex-shrink-0">
-          {quantity > 0 && (
-            <button
-              onClick={onRemove}
-              className="w-6 h-6 rounded-full bg-[#E8E0D0] hover:bg-[#D8D0C0] text-[#1A1510] flex items-center justify-center text-sm font-bold transition-colors"
-            >
-              −
-            </button>
-          )}
-          {quantity > 0 && (
-            <span className="text-sm font-bold text-[#0E8C7E] w-4 text-center">{quantity}</span>
-          )}
-          {quantity < accessory.maxQuantity && (
-            <button
-              onClick={onAdd}
-              className={`w-6 h-6 rounded-full flex items-center justify-center text-sm font-bold transition-colors ${
-                quantity === 0
-                  ? 'bg-[#1A1510] hover:bg-[#2A2520] text-white'
-                  : 'bg-[#0E8C7E] hover:bg-[#0A7068] text-white'
-              }`}
-            >
-              +
-            </button>
-          )}
-          {quantity === accessory.maxQuantity && accessory.maxQuantity > 0 && (
-            <span className="text-xs text-[#9A8E80] italic">max</span>
-          )}
+function AccessoryCard({ acc, qty, onAdd, onRemove }: {
+  acc: Accessory; qty: number; onAdd: () => void; onRemove: () => void;
+}) {
+  const active = qty > 0;
+  return (
+    <div style={{
+      background: active ? '#F0F9F7' : 'white',
+      border: `1.5px solid ${active ? '#0E8C7E40' : '#EAE4DA'}`,
+      borderRadius: 10,
+      padding: '8px 10px',
+      display: 'flex', alignItems: 'center', gap: 8,
+      transition: 'all 0.18s',
+    }}>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+          <span style={{ fontSize: 12, fontWeight: 600, color: '#1A1510' }}>{acc.name}</span>
+          <span style={{ fontSize: 10, color: '#9A8E80' }}>{idr(acc.price)}/mo</span>
         </div>
+        <p style={{ fontSize: 10, color: '#9A8E80', marginTop: 2, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
+          {acc.tagline}
+        </p>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0 }}>
+        {qty > 0 && (
+          <button
+            onClick={onRemove}
+            style={{
+              width: 22, height: 22, borderRadius: '50%',
+              background: '#EAE4DA', border: 'none', cursor: 'pointer',
+              fontSize: 14, fontWeight: 700, color: '#1A1510',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              lineHeight: 1,
+            }}
+          >−</button>
+        )}
+        {qty > 0 && (
+          <span style={{ fontSize: 13, fontWeight: 700, color: '#0E8C7E', width: 14, textAlign: 'center' }}>{qty}</span>
+        )}
+        {qty < acc.maxQuantity ? (
+          <button
+            onClick={onAdd}
+            style={{
+              width: 22, height: 22, borderRadius: '50%',
+              background: qty === 0 ? '#1A1510' : '#0E8C7E',
+              border: 'none', cursor: 'pointer',
+              fontSize: 14, fontWeight: 700, color: 'white',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              lineHeight: 1,
+            }}
+          >+</button>
+        ) : (
+          <span style={{ fontSize: 9, color: '#9A8E80', fontStyle: 'italic' }}>max</span>
+        )}
       </div>
     </div>
   );
