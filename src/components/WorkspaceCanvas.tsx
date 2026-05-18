@@ -18,7 +18,6 @@ export default function WorkspaceCanvas({ selection }: Props) {
 
   const isEmpty = !desk && !chair;
 
-  // Desk dims scale with widthScale
   const deskW = desk ? Math.round(420 * desk.widthScale) : 420;
   const deskH = 200;
   const deskX = (800 - deskW) / 2;
@@ -26,7 +25,6 @@ export default function WorkspaceCanvas({ selection }: Props) {
 
   return (
     <div className="relative w-full h-full flex items-center justify-center overflow-hidden rounded-2xl bg-[#EDE8DF]">
-      {/* Subtle grid floor */}
       <svg
         viewBox="0 0 800 560"
         className="w-full h-full"
@@ -68,7 +66,7 @@ export default function WorkspaceCanvas({ selection }: Props) {
         </radialGradient>
         <rect width="800" height="560" fill="url(#vignette)" />
 
-        {/* === EMPTY STATE === */}
+        {/* empty state */}
         {isEmpty && (
           <g>
             <text x="400" y="240" textAnchor="middle" fontSize="64" opacity="0.15">🏝</text>
@@ -81,7 +79,7 @@ export default function WorkspaceCanvas({ selection }: Props) {
           </g>
         )}
 
-        {/* === DESK === */}
+        {/* desk */}
         {desk && (
           <g className="animate-float-in" key={`desk-${desk.id}`}>
             {/* Rug under desk */}
@@ -191,7 +189,6 @@ export default function WorkspaceCanvas({ selection }: Props) {
               />
             )}
 
-            {/* === ITEMS ON DESK === */}
 
             {/* Keyboard — always shown when desk is selected */}
             <g className="animate-fade-up">
@@ -283,7 +280,6 @@ export default function WorkspaceCanvas({ selection }: Props) {
               </g>
             )}
 
-            {/* === MONITORS === */}
             {monitorQty >= 1 && (
               <g key="monitor-1" className="animate-float-in">
                 {/* Stand */}
@@ -394,7 +390,6 @@ export default function WorkspaceCanvas({ selection }: Props) {
               </g>
             )}
 
-            {/* === LAMP === */}
             {hasLamp && (
               <g key="lamp" className="animate-float-in">
                 {/* Base */}
@@ -437,7 +432,6 @@ export default function WorkspaceCanvas({ selection }: Props) {
               </g>
             )}
 
-            {/* === PLANTS === */}
             {plantQty >= 1 && (
               <g key="plant-1" className="animate-float-in">
                 {/* Pot */}
@@ -469,7 +463,7 @@ export default function WorkspaceCanvas({ selection }: Props) {
           </g>
         )}
 
-        {/* === CHAIR === */}
+        {/* chair */}
         {chair && (
           <g
             key={`chair-${chair.id}`}
