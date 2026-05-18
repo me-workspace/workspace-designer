@@ -100,6 +100,10 @@ export default function PackagesPanel({ savedDesigns, onApplyPreset, onLoad, onD
                   <p style={{ fontSize: 11, fontWeight: 600, color: '#d4d4d8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {sd.name}
                   </p>
+                  <p style={{ fontSize: 9, color: '#71717a', marginTop: 1 }}>
+                    {sd.design.stations.length} desk{sd.design.stations.length > 1 ? 's' : ''}
+                    {sd.design.zones.length > 0 && ` · ${sd.design.zones.length} zone${sd.design.zones.length > 1 ? 's' : ''}`}
+                  </p>
                   <p style={{ fontSize: 9, color: '#52525b', marginTop: 1 }}>
                     {idr(sd.total)}/mo · {new Date(sd.createdAt).toLocaleDateString('id-ID', { month: 'short', day: 'numeric' })}
                   </p>

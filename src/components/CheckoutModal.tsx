@@ -11,6 +11,7 @@ interface Props {
 
 const idr = (n: number) =>
   new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(n);
+const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
 export default function CheckoutModal({ design, onClose }: Props) {
   const [submitted, setSubmitted] = useState(false);
@@ -87,6 +88,21 @@ export default function CheckoutModal({ design, onClose }: Props) {
               >✕</button>
             </div>
 
+            {/* Scene summary */}
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', padding: '10px 20px', borderBottom: '1px solid #2c2c2f' }}>
+              {[
+                `${cap(design.environment.roomStyle)} · ${cap(design.environment.timeOfDay)}`,
+                teamSize > 1 ? `${teamSize} workspaces` : 'Solo workspace',
+                ...(zoneItems.length > 0 ? [`${zoneItems.length} ${zoneItems.length === 1 ? 'zone' : 'zones'}`] : []),
+              ].map((t, i) => (
+                <span key={i} style={{
+                  fontSize: 10, fontWeight: 600, color: '#a1a1aa',
+                  background: '#111113', border: '1px solid #2c2c2f',
+                  borderRadius: 20, padding: '3px 9px',
+                }}>{t}</span>
+              ))}
+            </div>
+
             {/* Line items */}
             <div style={{ padding: '14px 20px', maxHeight: 240, overflowY: 'auto' }}>
               {empty ? (
@@ -115,8 +131,8 @@ export default function CheckoutModal({ design, onClose }: Props) {
 
             {/* Totals + CTA */}
             <div style={{ padding: '14px 20px 20px', borderTop: '1px solid #2c2c2f' }}>
-              <TotalRow label="Per workspace" amount={perStation} />
-              {teamSize > 1 && <TotalRow label={`× ${teamSize} workspaces`} amount={stationsSubtotal} />}
+              {stationItems.length > 0 && <TotalRow label="Per workspace" amount={perStation} />}
+              {stationItems.length > 0 && teamSize > 1 && <TotalRow label={`× ${teamSize} workspaces`} amount={stationsSubtotal} />}
               {zoneItems.length > 0 && <TotalRow label={`Shared zones (${zoneItems.length})`} amount={zonesTotal} />}
 
               <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', margin: '10px 0 14px', paddingTop: 10, borderTop: '1px solid #2c2c2f' }}>
