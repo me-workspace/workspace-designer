@@ -119,6 +119,19 @@ export default function Page() {
               <span style={{ fontSize: 10, color: '#52525b' }}>/mo</span>
             </div>
           )}
+          {canCheckout && (
+            <button
+              onClick={() => setSelection(INITIAL)}
+              style={{
+                padding: '5px 12px', borderRadius: 8, fontSize: 12, fontWeight: 600,
+                background: '#1c1c1f', color: '#71717a',
+                border: '1px solid #2c2c2f',
+                cursor: 'pointer', transition: 'all 0.15s',
+              }}
+            >
+              Reset
+            </button>
+          )}
           <button
             onClick={() => setShowPackages(p => !p)}
             style={{

@@ -45,7 +45,7 @@ export default function SelectorPanel({ selection, onDeskChange, onChairChange, 
         </p>
         <h2 style={{ fontSize: 14, fontWeight: 700, color: '#f2f2f7' }}>Build your workspace</h2>
         <div style={{ display: 'flex', gap: 5, marginTop: 10 }}>
-          {['Desk', 'Chair', 'Extras'].map((label, i) => {
+          {['Desk', 'Chair', 'Accessories'].map((label, i) => {
             const done = i === 0 ? step1Done : i === 1 ? step2Done : false;
             const active = i === 0 ? true : i === 1 ? step1Done : step1Done && step2Done;
             return (
