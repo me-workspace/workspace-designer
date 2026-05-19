@@ -1,94 +1,78 @@
 'use client';
 
-import { useState, useMemo, useEffect, useCallback } from 'react';
-import type { Desk, Chair, Accessory, WorkspaceSelection, SavedPkg } from '@/types';
+import { useState, useMemo, useEffect } from 'react';
+import type { WorkspaceDesign, SavedDesign, EnvironmentConfig } from '@/model/types';
+import {
+  emptyDesign, editStation, setStationCount, presetToDesign,
+  designTotal, addDevice, removeDevice, getDesk, getSeating, getDevice,
+} from '@/model/design';
 import WorkspaceCanvas from '@/components/WorkspaceCanvas';
 import SelectorPanel from '@/components/SelectorPanel';
 import CheckoutModal from '@/components/CheckoutModal';
 import PackagesPanel from '@/components/PackagesPanel';
-import { DESKS, CHAIRS, ACCESSORIES, PACKAGE_PRESETS } from '@/data/products';
+import EnvironmentPanel from '@/components/EnvironmentPanel';
 
-const INITIAL: WorkspaceSelection = { desk: null, chair: null, accessories: {} };
-const QTY_OPTIONS = [1, 3, 5, 10] as const;
-type Qty = (typeof QTY_OPTIONS)[number];
+const TEAM_OPTIONS = [1, 3, 5, 10] as const;
+const STORAGE_KEY = 'monis_designs_v2';
 
 const idr = (n: number) =>
   new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(n);
 
-function computeTotal(s: WorkspaceSelection) {
-  let t = 0;
-  if (s.desk) t += s.desk.price;
-  if (s.chair) t += s.chair.price;
-  for (const { item, quantity } of Object.values(s.accessories)) t += item.price * quantity;
-  return t;
-}
-
-const STORAGE_KEY = 'monis_saved_packages';
-
 export default function Page() {
-  const [selection, setSelection] = useState<WorkspaceSelection>(INITIAL);
-  const [qty, setQty] = useState<Qty>(1);
+  const [design, setDesign] = useState<WorkspaceDesign>(emptyDesign);
   const [showCheckout, setShowCheckout] = useState(false);
-  const [showPackages, setShowPackages] = useState(false);
-  const [savedPackages, setSavedPackages] = useState<SavedPkg[]>([]);
+  const [rightPanel, setRightPanel] = useState<'none' | 'packages' | 'scene'>('none');
+  const [savedDesigns, setSavedDesigns] = useState<SavedDesign[]>([]);
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const [saveName, setSaveName] = useState('');
 
-  const total = useMemo(() => computeTotal(selection), [selection]);
+  const template = design.stations[0];
+  const teamSize = design.stations.length;
+  const total = useMemo(() => designTotal(design), [design]);
+
+  const deviceCounts = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const d of template.devices) m.set(d.deviceId, (m.get(d.deviceId) ?? 0) + 1);
+    return [...m.entries()];
+  }, [template]);
 
   useEffect(() => {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) setSavedPackages(JSON.parse(raw));
+      if (raw) setSavedDesigns(JSON.parse(raw));
     } catch {}
   }, []);
 
-  const persistSaved = (pkgs: SavedPkg[]) => {
-    setSavedPackages(pkgs);
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(pkgs)); } catch {}
+  const persistSaved = (list: SavedDesign[]) => {
+    setSavedDesigns(list);
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(list)); } catch {}
   };
 
-  const handleDeskChange = (desk: Desk) => setSelection(prev => ({ ...prev, desk }));
-  const handleChairChange = (chair: Chair) => setSelection(prev => ({ ...prev, chair }));
-  const handleAccessoryChange = (accessory: Accessory, delta: number) => {
-    setSelection(prev => {
-      const cur = prev.accessories[accessory.id]?.quantity ?? 0;
-      const next = Math.min(Math.max(cur + delta, 0), accessory.maxQuantity);
-      if (next === 0) {
-        const { [accessory.id]: _, ...rest } = prev.accessories;
-        return { ...prev, accessories: rest };
-      }
-      return { ...prev, accessories: { ...prev.accessories, [accessory.id]: { item: accessory, quantity: next } } };
-    });
-  };
-
-  const applyPreset = useCallback((presetId: string) => {
-    const preset = PACKAGE_PRESETS.find(p => p.id === presetId);
-    if (!preset) return;
-    const desk = DESKS.find(d => d.id === preset.deskId) ?? null;
-    const chair = CHAIRS.find(c => c.id === preset.chairId) ?? null;
-    const accessories: WorkspaceSelection['accessories'] = {};
-    for (const [id, q] of Object.entries(preset.accessories)) {
-      const acc = ACCESSORIES.find(a => a.id === id);
-      if (acc) accessories[id] = { item: acc, quantity: q };
-    }
-    setSelection({ desk, chair, accessories });
-  }, []);
+  const handleDesk = (deskId: string) => setDesign(d => editStation(d, s => ({ ...s, deskId })));
+  const handleSeating = (seatingId: string) => setDesign(d => editStation(d, s => ({ ...s, seatingId })));
+  const handleDevice = (deviceId: string, delta: number) =>
+    setDesign(d => editStation(d, s => (delta > 0 ? addDevice(s, deviceId) : removeDevice(s, deviceId))));
+  const handlePreset = (presetId: string) => setDesign(presetToDesign(presetId));
+  const handleTeamSize = (n: number) => setDesign(d => setStationCount(d, n));
+  const handleReset = () => setDesign(emptyDesign());
+  const handleEnv = (patch: Partial<EnvironmentConfig>) =>
+    setDesign(d => ({ ...d, environment: { ...d.environment, ...patch } }));
 
   const handleSave = () => {
     const name = saveName.trim() ||
       `Setup ${new Date().toLocaleDateString('id-ID', { month: 'short', day: 'numeric' })}`;
-    const pkg: SavedPkg = { id: crypto.randomUUID(), name, createdAt: Date.now(), selection, total };
-    persistSaved([pkg, ...savedPackages]);
+    const sd: SavedDesign = { id: crypto.randomUUID(), name, createdAt: Date.now(), design, total };
+    persistSaved([sd, ...savedDesigns]);
     setSaveDialogOpen(false);
     setSaveName('');
-    setShowPackages(true);
+    setRightPanel('packages');
   };
+  const handleDelete = (id: string) => persistSaved(savedDesigns.filter(s => s.id !== id));
+  const handleLoad = (sd: SavedDesign) => { setDesign(sd.design); setRightPanel('none'); };
 
-  const handleDeletePkg = (id: string) => persistSaved(savedPackages.filter(p => p.id !== id));
-  const handleLoadPkg = (pkg: SavedPkg) => { setSelection(pkg.selection); setShowPackages(false); };
-
-  const canCheckout = selection.desk !== null || selection.chair !== null;
+  const canCheckout = !!template.deskId || !!template.seatingId;
+  const desk = getDesk(template.deskId);
+  const seating = getSeating(template.seatingId);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden', background: '#09090b', color: '#f2f2f7' }}>
@@ -114,18 +98,17 @@ export default function Page() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           {total > 0 && (
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 3 }}>
-              {qty > 1 && <span style={{ fontSize: 10, color: '#52525b' }}>{qty}× ·&nbsp;</span>}
-              <span style={{ fontSize: 13, fontWeight: 700, color: '#4ade80' }}>{idr(total * qty)}</span>
+              {teamSize > 1 && <span style={{ fontSize: 10, color: '#52525b' }}>{teamSize} desks ·&nbsp;</span>}
+              <span style={{ fontSize: 13, fontWeight: 700, color: '#4ade80' }}>{idr(total)}</span>
               <span style={{ fontSize: 10, color: '#52525b' }}>/mo</span>
             </div>
           )}
           {canCheckout && (
             <button
-              onClick={() => setSelection(INITIAL)}
+              onClick={handleReset}
               style={{
                 padding: '5px 12px', borderRadius: 8, fontSize: 12, fontWeight: 600,
-                background: '#1c1c1f', color: '#71717a',
-                border: '1px solid #2c2c2f',
+                background: '#1c1c1f', color: '#71717a', border: '1px solid #2c2c2f',
                 cursor: 'pointer', transition: 'all 0.15s',
               }}
             >
@@ -133,16 +116,28 @@ export default function Page() {
             </button>
           )}
           <button
-            onClick={() => setShowPackages(p => !p)}
+            onClick={() => setRightPanel(p => (p === 'scene' ? 'none' : 'scene'))}
             style={{
               padding: '5px 12px', borderRadius: 8, fontSize: 12, fontWeight: 600,
-              background: showPackages ? 'rgba(74,222,128,0.1)' : '#1c1c1f',
-              color: showPackages ? '#4ade80' : '#a1a1aa',
-              border: `1px solid ${showPackages ? 'rgba(74,222,128,0.25)' : '#2c2c2f'}`,
+              background: rightPanel === 'scene' ? 'rgba(74,222,128,0.1)' : '#1c1c1f',
+              color: rightPanel === 'scene' ? '#4ade80' : '#a1a1aa',
+              border: `1px solid ${rightPanel === 'scene' ? 'rgba(74,222,128,0.25)' : '#2c2c2f'}`,
               cursor: 'pointer', transition: 'all 0.15s',
             }}
           >
-            Packages{savedPackages.length > 0 ? ` (${savedPackages.length})` : ''}
+            Scene
+          </button>
+          <button
+            onClick={() => setRightPanel(p => (p === 'packages' ? 'none' : 'packages'))}
+            style={{
+              padding: '5px 12px', borderRadius: 8, fontSize: 12, fontWeight: 600,
+              background: rightPanel === 'packages' ? 'rgba(74,222,128,0.1)' : '#1c1c1f',
+              color: rightPanel === 'packages' ? '#4ade80' : '#a1a1aa',
+              border: `1px solid ${rightPanel === 'packages' ? 'rgba(74,222,128,0.25)' : '#2c2c2f'}`,
+              cursor: 'pointer', transition: 'all 0.15s',
+            }}
+          >
+            Packages{savedDesigns.length > 0 ? ` (${savedDesigns.length})` : ''}
           </button>
           <button
             onClick={() => setShowCheckout(true)}
@@ -170,14 +165,14 @@ export default function Page() {
           background: '#0d0d10', overflow: 'hidden', display: 'flex', flexDirection: 'column',
         }}>
           <SelectorPanel
-            selection={selection}
-            onDeskChange={handleDeskChange}
-            onChairChange={handleChairChange}
-            onAccessoryChange={handleAccessoryChange}
+            station={template}
+            onDeskChange={handleDesk}
+            onSeatingChange={handleSeating}
+            onDeviceChange={handleDevice}
           />
         </aside>
 
-        {/* Center: Canvas + bottom */}
+        {/* Center: Canvas */}
         <main style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column', padding: 16, gap: 12 }}>
 
           {/* Top bar */}
@@ -187,27 +182,23 @@ export default function Page() {
                 Your Studio
               </span>
               <p style={{ fontSize: 11, color: '#71717a', marginTop: 2 }}>
-                {qty === 1 ? 'Solo workspace' : `Office for ${qty} — ${qty} identical setups`}
+                {teamSize === 1 ? 'Solo workspace' : `Office for ${teamSize} — ${teamSize} identical setups`}
               </p>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <span style={{ fontSize: 10, fontWeight: 700, color: '#52525b', letterSpacing: '0.1em', textTransform: 'uppercase' }}>
                 Team size
               </span>
-              <div style={{
-                display: 'flex', gap: 3, padding: 3, borderRadius: 9,
-                background: '#1c1c1f', border: '1px solid #2c2c2f',
-              }}>
-                {QTY_OPTIONS.map(q => (
+              <div style={{ display: 'flex', gap: 3, padding: 3, borderRadius: 9, background: '#1c1c1f', border: '1px solid #2c2c2f' }}>
+                {TEAM_OPTIONS.map(q => (
                   <button
                     key={q}
-                    onClick={() => setQty(q)}
+                    onClick={() => handleTeamSize(q)}
                     style={{
                       minWidth: 38, height: 24, padding: '0 9px', borderRadius: 6,
-                      background: qty === q ? '#4ade80' : 'transparent',
-                      color: qty === q ? '#09090b' : '#71717a',
-                      border: 'none',
-                      fontSize: 11, fontWeight: qty === q ? 800 : 600,
+                      background: teamSize === q ? '#4ade80' : 'transparent',
+                      color: teamSize === q ? '#09090b' : '#71717a',
+                      border: 'none', fontSize: 11, fontWeight: teamSize === q ? 800 : 600,
                       cursor: 'pointer', transition: 'all 0.12s',
                     }}
                   >
@@ -220,22 +211,19 @@ export default function Page() {
 
           {/* Canvas */}
           <div style={{ flex: 1, minHeight: 0, borderRadius: 14, overflow: 'hidden', border: '1px solid #1f1f22' }}>
-            <WorkspaceCanvas selection={selection} qty={qty} />
+            <WorkspaceCanvas design={design} />
           </div>
 
           {/* Bottom bar */}
           <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 8, minHeight: 34 }}>
-            {(selection.desk || selection.chair) ? (
+            {(desk || seating || deviceCounts.length > 0) ? (
               <div style={{ flex: 1, display: 'flex', gap: 5, overflow: 'hidden', flexWrap: 'nowrap' }}>
-                {selection.desk && (
-                  <InfoChip label={selection.desk.name} sub="desk" color={selection.desk.surfaceColor} />
-                )}
-                {selection.chair && (
-                  <InfoChip label={selection.chair.name} sub="chair" color={selection.chair.seatColor} />
-                )}
-                {Object.values(selection.accessories).map(({ item, quantity }) => (
-                  <InfoChip key={item.id} label={item.name} sub={`×${quantity}`} color="#4ade80" />
-                ))}
+                {desk && <InfoChip label={desk.name} sub="desk" color={desk.spec.surfaceColor} />}
+                {seating && <InfoChip label={seating.name} sub="chair" color={seating.spec.seatColor} />}
+                {deviceCounts.map(([id, n]) => {
+                  const dev = getDevice(id);
+                  return dev ? <InfoChip key={id} label={dev.name} sub={`×${n}`} color={dev.spec.accentColor} /> : null;
+                })}
               </div>
             ) : (
               <p style={{ flex: 1, fontSize: 11, color: '#3f3f46', fontStyle: 'italic' }}>
@@ -289,29 +277,28 @@ export default function Page() {
           </div>
         </main>
 
-        {/* Right: Packages Panel */}
-        {showPackages && (
+        {/* Right panel */}
+        {rightPanel !== 'none' && (
           <aside style={{
             width: 264, flexShrink: 0, borderLeft: '1px solid #1f1f22',
             background: '#0d0d10', overflow: 'hidden', display: 'flex', flexDirection: 'column',
           }}>
-            <PackagesPanel
-              savedPackages={savedPackages}
-              onApplyPreset={applyPreset}
-              onLoadPkg={handleLoadPkg}
-              onDeletePkg={handleDeletePkg}
-            />
+            {rightPanel === 'packages' ? (
+              <PackagesPanel
+                savedDesigns={savedDesigns}
+                onApplyPreset={handlePreset}
+                onLoad={handleLoad}
+                onDelete={handleDelete}
+              />
+            ) : (
+              <EnvironmentPanel environment={design.environment} onChange={handleEnv} />
+            )}
           </aside>
         )}
       </div>
 
       {showCheckout && (
-        <CheckoutModal
-          selection={selection}
-          total={total}
-          qty={qty}
-          onClose={() => setShowCheckout(false)}
-        />
+        <CheckoutModal design={design} onClose={() => setShowCheckout(false)} />
       )}
     </div>
   );

@@ -1,29 +1,37 @@
 'use client';
 
-import type { WorkspaceSelection } from '@/types';
 import { useState } from 'react';
+import type { WorkspaceDesign } from '@/model/types';
+import { getDesk, getSeating, getDevice, stationTotal, designTotal } from '@/model/design';
 
 interface Props {
-  selection: WorkspaceSelection;
-  total: number;
-  qty: number;
+  design: WorkspaceDesign;
   onClose: () => void;
 }
 
 const idr = (n: number) =>
   new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(n);
 
-export default function CheckoutModal({ selection, total, qty, onClose }: Props) {
+export default function CheckoutModal({ design, onClose }: Props) {
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const items = [
-    ...(selection.desk ? [{ name: `${selection.desk.name} Desk`, price: selection.desk.price, qty: 1 }] : []),
-    ...(selection.chair ? [{ name: `${selection.chair.name} Chair`, price: selection.chair.price, qty: 1 }] : []),
-    ...Object.values(selection.accessories).map(({ item, quantity }) => ({
-      name: item.name, price: item.price, qty: quantity,
-    })),
-  ];
+  const station = design.stations[0];
+  const teamSize = design.stations.length;
+  const perStation = stationTotal(station);
+  const total = designTotal(design);
+
+  const items: { name: string; price: number; qty: number }[] = [];
+  const desk = getDesk(station.deskId);
+  if (desk) items.push({ name: `${desk.name} Desk`, price: desk.price, qty: 1 });
+  const seating = getSeating(station.seatingId);
+  if (seating) items.push({ name: `${seating.name} Chair`, price: seating.price, qty: 1 });
+  const counts = new Map<string, number>();
+  for (const d of station.devices) counts.set(d.deviceId, (counts.get(d.deviceId) ?? 0) + 1);
+  counts.forEach((n, id) => {
+    const dev = getDevice(id);
+    if (dev) items.push({ name: dev.name, price: dev.price, qty: n });
+  });
 
   const handleRent = () => {
     setLoading(true);
@@ -41,10 +49,8 @@ export default function CheckoutModal({ selection, total, qty, onClose }: Props)
     >
       <div className="animate-slide-up" style={{
         width: '100%', maxWidth: 420,
-        background: '#1c1c1f', borderRadius: 18,
-        border: '1px solid #2c2c2f',
-        overflow: 'hidden',
-        boxShadow: '0 32px 80px rgba(0,0,0,0.6)',
+        background: '#1c1c1f', borderRadius: 18, border: '1px solid #2c2c2f',
+        overflow: 'hidden', boxShadow: '0 32px 80px rgba(0,0,0,0.6)',
       }}>
         {submitted ? (
           <SuccessView onClose={onClose} />
@@ -57,7 +63,9 @@ export default function CheckoutModal({ selection, total, qty, onClose }: Props)
             }}>
               <div>
                 <h2 style={{ fontSize: 16, fontWeight: 800, color: '#f2f2f7' }}>Your Setup</h2>
-                <p style={{ fontSize: 11, color: '#71717a', marginTop: 2 }}>Review before renting</p>
+                <p style={{ fontSize: 11, color: '#71717a', marginTop: 2 }}>
+                  {teamSize > 1 ? `Office for ${teamSize} · review before renting` : 'Review before renting'}
+                </p>
               </div>
               <button
                 onClick={onClose}
@@ -78,6 +86,11 @@ export default function CheckoutModal({ selection, total, qty, onClose }: Props)
                 </p>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {teamSize > 1 && (
+                    <p style={{ fontSize: 10, fontWeight: 700, color: '#52525b', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 2 }}>
+                      Per workspace
+                    </p>
+                  )}
                   {items.map((item, i) => (
                     <div key={i} style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8 }}>
                       <span style={{ fontSize: 12, color: '#d4d4d8' }}>
@@ -95,19 +108,17 @@ export default function CheckoutModal({ selection, total, qty, onClose }: Props)
 
             {/* Total + CTA */}
             <div style={{ padding: '14px 20px 20px', borderTop: '1px solid #2c2c2f' }}>
-              <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: qty > 1 ? 6 : 16 }}>
+              <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: teamSize > 1 ? 6 : 16 }}>
                 <span style={{ fontSize: 12, color: '#71717a' }}>Per workspace</span>
                 <span style={{ fontSize: 13, fontWeight: 700, color: '#f2f2f7' }}>
-                  {idr(total)}<span style={{ fontSize: 9, color: '#52525b', fontWeight: 400 }}>/mo</span>
+                  {idr(perStation)}<span style={{ fontSize: 9, color: '#52525b', fontWeight: 400 }}>/mo</span>
                 </span>
               </div>
-              {qty > 1 && (
+              {teamSize > 1 && (
                 <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 16 }}>
-                  <span style={{ fontSize: 13, fontWeight: 700, color: '#f2f2f7' }}>
-                    Total × {qty} workspaces
-                  </span>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: '#f2f2f7' }}>Total × {teamSize} workspaces</span>
                   <span style={{ fontSize: 18, fontWeight: 800, color: '#4ade80' }}>
-                    {idr(total * qty)}<span style={{ fontSize: 9, color: '#52525b', fontWeight: 400 }}>/mo</span>
+                    {idr(total)}<span style={{ fontSize: 9, color: '#52525b', fontWeight: 400 }}>/mo</span>
                   </span>
                 </div>
               )}
@@ -124,8 +135,7 @@ export default function CheckoutModal({ selection, total, qty, onClose }: Props)
                   background: items.length > 0 && !loading ? '#4ade80' : '#2c2c2f',
                   color: items.length > 0 && !loading ? '#09090b' : '#3f3f46',
                   border: 'none', cursor: items.length === 0 ? 'not-allowed' : 'pointer',
-                  fontSize: 13, fontWeight: 800, letterSpacing: '0.01em',
-                  transition: 'all 0.15s',
+                  fontSize: 13, fontWeight: 800, letterSpacing: '0.01em', transition: 'all 0.15s',
                 }}
               >
                 {loading ? (
@@ -136,7 +146,7 @@ export default function CheckoutModal({ selection, total, qty, onClose }: Props)
                     Processing…
                   </span>
                 ) : (
-                  `Rent ${qty > 1 ? `${qty} Workspaces` : 'My Setup'} →`
+                  `Rent ${teamSize > 1 ? `${teamSize} Workspaces` : 'My Setup'} →`
                 )}
               </button>
             </div>
@@ -152,8 +162,7 @@ function SuccessView({ onClose }: { onClose: () => void }) {
     <div className="animate-fade-up" style={{ padding: '40px 24px', textAlign: 'center' }}>
       <div style={{
         width: 52, height: 52, borderRadius: '50%',
-        background: 'rgba(74,222,128,0.12)',
-        border: '1.5px solid rgba(74,222,128,0.3)',
+        background: 'rgba(74,222,128,0.12)', border: '1.5px solid rgba(74,222,128,0.3)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         margin: '0 auto 16px', color: '#4ade80', fontSize: 22, fontWeight: 700,
       }}>✓</div>
@@ -171,8 +180,7 @@ function SuccessView({ onClose }: { onClose: () => void }) {
         style={{
           padding: '10px 24px', borderRadius: 10,
           background: '#4ade80', color: '#09090b',
-          border: 'none', cursor: 'pointer',
-          fontSize: 12, fontWeight: 800,
+          border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 800,
         }}
       >
         Back to designer
